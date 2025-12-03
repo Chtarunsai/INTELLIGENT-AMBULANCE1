@@ -1,6 +1,6 @@
 # hospital_dashboard.py - Hospital Server (Port 5001)
 
-from flask import Flask, render_template_string, jsonify, request, render_template, redirect, url_for # render_template, redirect, url_for added
+from flask import Flask, render_template_string, jsonify, request, render_template, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 import os 
@@ -8,7 +8,7 @@ import json
 import socket 
 from pathlib import Path
 import urllib.parse 
-import requests # Required to send POST notification
+import requests 
 
 # --- FUNCTION TO GET LOCAL IP (RETAINED FOR LOCAL DEBUGGING ONLY) ---
 def get_local_ip():
@@ -30,20 +30,19 @@ MY_IP_ADDRESS = get_local_ip()
 AMBULANCE_APP_URL = os.environ.get("AMBULANCE_APP_URL", f"http://{MY_IP_ADDRESS}:5000") 
 
 # --- FIX 2: TEMPLATE PATH ---
-# Assuming the file is now /clite/project/AMBULANCE/hospital_view.py, the path is adjusted.
-# This assumes the template folder is 3 levels up from the current file location.
+# Assuming the file's current location relative to the top-level /templates folder is correct.
+# We are keeping the existing template_dir calculation (which was aiming for '../.. /.. /templates').
 template_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..', 'templates'))
 hospital_app = Flask(__name__, template_folder=template_dir) 
 
-# --- FIX 3: DATABASE CONFIGURATION AND db DEFINITION ---
+# --- FIX 3: DATABASE CONFIGURATION AND db DEFINITION (Corrected Order) ---
 hospital_app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///ambulance_app.db'
 hospital_app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False 
 
-db = SQLAlchemy(hospital_app) # 'db' is now defined before initialization
+db = SQLAlchemy(hospital_app) 
 
 # --- FIX 4: DB and Initialization Logic moved outside __main__ ---
 def initialize_db():
-    # This function now correctly uses the pre-defined 'db' variable
     with hospital_app.app_context():
         db.create_all()
 
@@ -224,10 +223,10 @@ def dashboard_root():
 @hospital_app.route('/dashboard/<int:case_id>')
 def hospital_dashboard(case_id):
     """Serves the main Hospital Dashboard HTML template."""
-    # --- FIX 5: Use standard render_template ---
+    # --- FIX: Updated filename to hospital_dashboard.html (with underscore) ---
     try:
-        # Flask now knows the path via app initialization (template_folder=template_dir)
-        return render_template('hospital dashboard.html', case_id=case_id, dashboard_url=AMBULANCE_APP_URL)
+        # Template filename is changed from 'hospital dashboard.html' to 'hospital_dashboard.html'
+        return render_template('hospital_dashboard.html', case_id=case_id, dashboard_url=AMBULANCE_APP_URL)
     except Exception as e:
         return f"Dashboard HTML file NOT FOUND. Error: {e}", 500
 
