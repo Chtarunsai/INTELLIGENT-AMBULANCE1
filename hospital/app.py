@@ -33,7 +33,7 @@ MY_IP_ADDRESS = get_local_ip()
 AMBULANCE_START_LOCATION = "17-22, 2nd Main Rd, Vinayak Nagar, Kattigenahalli, Bengaluru, Karnataka 560064"
 
 # *** CRITICAL: VERIFY THIS PATH ON YOUR SYSTEM ***
-HTML_FILE_PATH = Path(r"C:\Users\CHTAR\OneDrive\Desktop\clite (2)\clite\template\index.html") 
+HTML_FILE_PATH = Path(r"C:\Users\CHTAR\OneDrive\Desktop\pro\templates\index.html") 
 
 HOSPITAL_DASHBOARD_PORT = 5001 
 HOSPITAL_APP_URL = f"http://{MY_IP_ADDRESS}:{HOSPITAL_DASHBOARD_PORT}"
