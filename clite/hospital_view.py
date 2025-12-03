@@ -1,9 +1,9 @@
 # hospital_dashboard.py - Hospital Server (Port 5001)
 
-from flask import Flask, render_template_string, jsonify, request, render_template # render_template added
+from flask import Flask, render_template_string, jsonify, request, render_template, redirect, url_for # render_template, redirect, url_for added
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
-import os # <--- os module needed for path fixing
+import os 
 import json 
 import socket 
 from pathlib import Path
@@ -26,19 +26,20 @@ def get_local_ip():
 HOSPITAL_SERVER_PORT = 5001
 MY_IP_ADDRESS = get_local_ip() 
 
-# --- FIX 1: USE RENDER ENVIRONMENT VARIABLE ---
+# --- FIX 1: USE RENDER ENVIRONMENT VARIABLE for Inter-Service Communication ---
 AMBULANCE_APP_URL = os.environ.get("AMBULANCE_APP_URL", f"http://{MY_IP_ADDRESS}:5000") 
 
 # --- FIX 2: TEMPLATE PATH ---
 # Assuming the file is now /clite/project/AMBULANCE/hospital_view.py, the path is adjusted.
+# This assumes the template folder is 3 levels up from the current file location.
 template_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..', 'templates'))
 hospital_app = Flask(__name__, template_folder=template_dir) 
 
-# --- FIX 3: DATABASE CONFIGURATION AND db DEFINITION (Moved UP) ---
+# --- FIX 3: DATABASE CONFIGURATION AND db DEFINITION ---
 hospital_app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///ambulance_app.db'
 hospital_app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False 
 
-db = SQLAlchemy(hospital_app) # <-- 'db' IS NOW DEFINED HERE
+db = SQLAlchemy(hospital_app) # 'db' is now defined before initialization
 
 # --- FIX 4: DB and Initialization Logic moved outside __main__ ---
 def initialize_db():
@@ -47,7 +48,7 @@ def initialize_db():
         db.create_all()
 
 # --- Initialize DB on Startup so Gunicorn executes it ---
-initialize_db() # <-- THIS NOW WORKS
+initialize_db() 
 
 # ==============================================================================
 # --- DATABASE MODELS (These must always come AFTER db = SQLAlchemy) ---
@@ -55,7 +56,6 @@ initialize_db() # <-- THIS NOW WORKS
 
 class User(db.Model):
     __tablename__ = 'user'
-# ... (User Model Code) ...
     crew_name = db.Column(db.String(80), primary_key=True, unique=True, nullable=False)
     password_hash = db.Column(db.String(128), nullable=False)
     hospital_name = db.Column(db.String(120), nullable=False)
@@ -65,7 +65,6 @@ class User(db.Model):
 
 class Case(db.Model):
     __tablename__ = 'case'
-# ... (Case Model Code) ...
     id = db.Column(db.Integer, primary_key=True)
     timestamp = db.Column(db.DateTime, nullable=False, default=db.func.now())
     crew_name = db.Column(db.String(80), db.ForeignKey('user.crew_name'), nullable=True) 
@@ -89,7 +88,6 @@ class Case(db.Model):
 # ==============================================================================
 # --- API ENDPOINTS ---
 # ==============================================================================
-# ... (All routes update_acceptance, get_case_data, hospital_dashboard remain unchanged) ...
 
 @hospital_app.route('/api/update_acceptance/<int:case_id>', methods=['POST'])
 def update_acceptance(case_id):
@@ -138,7 +136,6 @@ def update_acceptance(case_id):
 
 @hospital_app.route('/api/case_data/<int:case_id>', methods=['GET'])
 def get_case_data(case_id):
-# ... (get_case_data route remains unchanged) ...
     """Fetches case data for the dashboard view."""
     with hospital_app.app_context():
         case = Case.query.get(case_id)
@@ -187,6 +184,42 @@ def get_case_data(case_id):
 # ==============================================================================
 # --- MAIN DASHBOARD ROUTE ---
 # ==============================================================================
+
+@hospital_app.route('/')
+def dashboard_root():
+    """
+    New root route. Fetches the list of all cases from the Ambulance Server 
+    and redirects to the most recent case ID. (Auto-fetch functionality)
+    """
+    # 1. Construct the API URL for the Ambulance Server's case history
+    ambulance_api_url = f"{AMBULANCE_APP_URL}/api/cases"
+    
+    try:
+        # 2. Request case history from the Ambulance Server
+        response = requests.get(ambulance_api_url, timeout=5)
+        response.raise_for_status() # Raise an exception for bad status codes (4xx or 5xx)
+        case_data = response.json()
+        
+        # 3. Find the most recent case ID
+        if case_data.get('success') and case_data.get('cases'):
+            # The API returns cases in descending order, so the first case is the latest.
+            latest_case = case_data['cases'][0]
+            latest_case_id = latest_case['id']
+            
+            # 4. Redirect to the specific dashboard URL using the latest ID
+            return redirect(url_for('hospital_dashboard', case_id=latest_case_id))
+            
+        else:
+            # If successful but no cases are found in the DB
+            return "No active cases found on the Ambulance Server database. Deploying complete.", 200
+
+    except requests.exceptions.RequestException as e:
+        # If the Ambulance Server is down or unreachable
+        print(f"ERROR: Could not connect to Ambulance Server at {AMBULANCE_APP_URL}. {e}")
+        return f"CRITICAL ERROR: Hospital Server cannot connect to Ambulance Server at {AMBULANCE_APP_URL}. Check connection and server status.", 503
+    except Exception as e:
+        return f"Internal Server Error during case retrieval: {e}", 500
+
 
 @hospital_app.route('/dashboard/<int:case_id>')
 def hospital_dashboard(case_id):
