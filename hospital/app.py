@@ -4,13 +4,12 @@ import json
 import random
 import time
 import urllib.parse
-import os
+import os # <--- os module needed for path fixing
 import socket 
 from datetime import datetime, timedelta
 from pathlib import Path 
 import requests 
-
-from flask import Flask, request, jsonify, render_template_string, redirect, url_for
+from flask import Flask, request, jsonify, render_template_string, redirect, url_for, render_template # <--- render_template is now the correct function
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -32,13 +31,18 @@ MY_IP_ADDRESS = get_local_ip()
 
 AMBULANCE_START_LOCATION = "17-22, 2nd Main Rd, Vinayak Nagar, Kattigenahalli, Bengaluru, Karnataka 560064"
 
-# *** CRITICAL: VERIFY THIS PATH ON YOUR SYSTEM ***
-HTML_FILE_PATH = Path(r"C:\Users\CHTAR\OneDrive\Desktop\pro\templates\index.html") 
+# *** FIX 1: REMOVE HARDCODED PATH AND PATHLIB IMPORT ***
+# The following line is removed: 
+# HTML_FILE_PATH = Path(r"C:\Users\CHTAR\OneDrive\Desktop\pro\templates\index.html") 
+# We rely on Flask's automatic template path detection after the app initialization fix.
 
 HOSPITAL_DASHBOARD_PORT = 5001 
 HOSPITAL_APP_URL = f"http://{MY_IP_ADDRESS}:{HOSPITAL_DASHBOARD_PORT}"
 
-app = Flask(__name__)
+# --- FIX 2: EXPLICITLY SET TEMPLATE FOLDER FOR SUBDIRECTORY APP ---
+# This correctly calculates the path to 'templates' (plural) in the root directory.
+template_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'templates'))
+app = Flask(__name__, template_folder=template_dir) # Initialize Flask with the correct template path
 
 # --- DATABASE CONFIGURATION ---
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///ambulance_app.db'
@@ -272,15 +276,12 @@ def initialize_app_data():
 @app.route('/', methods=['GET'])
 def index():
     """Serves the main HTML application."""
+    # --- FIX 3: USE standard render_template ---
     try:
-        with open(str(HTML_FILE_PATH), 'r', encoding='utf-8') as f:
-            html_content = f.read()
-        return render_template_string(html_content, is_vitals_view=False, case_data=None)
-    except FileNotFoundError:
-        print(f"\nFATAL ERROR: HTML file not found at: {HTML_FILE_PATH}")
-        return f"CRITICAL ERROR: HTML file NOT FOUND. Check path: {HTML_FILE_PATH}", 500
+        # Flask now knows the path via app initialization (template_folder=template_dir)
+        return render_template('index.html', is_vitals_view=False, case_data=None)
     except Exception as e:
-        return f"CRITICAL ERROR reading HTML file: {e}", 500
+        return f"CRITICAL ERROR rendering index.html: {e}", 500
 
 @app.route('/case_vitals/<int:case_id>', methods=['GET'])
 def case_vitals(case_id):
@@ -304,11 +305,9 @@ def case_vitals(case_id):
                                "hr": vitals_list[3], "o2": vitals_list[4], "temp": vitals_list[5], "rr": vitals_list[6]}
         }
         
+        # --- FIX 4: USE standard render_template ---
         try:
-            with open(str(HTML_FILE_PATH), 'r', encoding='utf-8') as f: html_content = f.read()
-            return render_template_string(html_content, case_data=patient_data, notification=notification_message, is_vitals_view=True)
-        except FileNotFoundError:
-            return f"CRITICAL ERROR: HTML file NOT FOUND at {HTML_FILE_PATH}", 500
+            return render_template('index.html', case_data=patient_data, notification=notification_message, is_vitals_view=True)
         except Exception as e:
             return f"Error rendering page: {e}", 500
 
@@ -513,12 +512,13 @@ def get_case_history():
 @app.route('/api/increment-case-count', methods=['POST'])
 def increment_case_count(): return jsonify({"success": True}), 200
 
-def initialize_app_data():
-    global HOSPITAL_DATA
-    HOSPITAL_DATA = _get_hardcoded_hospitals()
-    try:
-        with app.app_context(): db.create_all()
-    except Exception as e: print(f"Database initialization failed: {e}")
+# Duplicated, moved logic to __main__ block
+# def initialize_app_data():
+#     global HOSPITAL_DATA
+#     HOSPITAL_DATA = _get_hardcoded_hospitals()
+#     try:
+#         with app.app_context(): db.create_all()
+#     except Exception as e: print(f"Database initialization failed: {e}")
 
 if __name__ == '__main__':
     initialize_app_data()
