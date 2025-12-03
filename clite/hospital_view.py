@@ -27,37 +27,30 @@ HOSPITAL_SERVER_PORT = 5001
 MY_IP_ADDRESS = get_local_ip() 
 
 # --- FIX 1: USE RENDER ENVIRONMENT VARIABLE ---
-# This pulls the public URL of the Ambulance Server from the Render settings.
 AMBULANCE_APP_URL = os.environ.get("AMBULANCE_APP_URL", f"http://{MY_IP_ADDRESS}:5000") 
-# The local IP fallback is retained for local testing only.
 
-# *** FIX 2: REMOVE HARDCODED PATH AND USE RELATIVE PATH FIX ***
-# The line below is removed: HOSPITAL_HTML_FILE_PATH = Path(r"C:\Users\CHTAR\OneDrive\Desktop\clite (2)\clite\project\AMBULANCE\hospital dashboard.html") 
-# We rely on Flask's template folder setting.
-
-# --- FIX 3: EXPLICITLY SET TEMPLATE FOLDER FOR NESTED APP ---
-# Assumes hospital_dashboard.py is inside /clite/project/AMBULANCE/
-# Need to go up four levels (../.. /.. /.. /templates) or adjust based on your final move.
-# Assuming the file is now /clite/project/AMBULANCE/hospital_view.py, let's use the correct relative path:
+# --- FIX 2: TEMPLATE PATH ---
+# Assuming the file is now /clite/project/AMBULANCE/hospital_view.py, the path is adjusted.
 template_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..', 'templates'))
 hospital_app = Flask(__name__, template_folder=template_dir) 
 
+# --- FIX 3: DATABASE CONFIGURATION AND db DEFINITION (Moved UP) ---
+hospital_app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///ambulance_app.db'
+hospital_app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False 
+
+db = SQLAlchemy(hospital_app) # <-- 'db' IS NOW DEFINED HERE
+
 # --- FIX 4: DB and Initialization Logic moved outside __main__ ---
 def initialize_db():
+    # This function now correctly uses the pre-defined 'db' variable
     with hospital_app.app_context():
         db.create_all()
 
 # --- Initialize DB on Startup so Gunicorn executes it ---
-initialize_db()
-
-# --- Database Configuration (Unchanged) ---
-hospital_app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///ambulance_app.db'
-hospital_app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False 
-
-db = SQLAlchemy(hospital_app)
+initialize_db() # <-- THIS NOW WORKS
 
 # ==============================================================================
-# --- DATABASE MODELS (Unchanged) ---
+# --- DATABASE MODELS (These must always come AFTER db = SQLAlchemy) ---
 # ==============================================================================
 
 class User(db.Model):
@@ -96,6 +89,7 @@ class Case(db.Model):
 # ==============================================================================
 # --- API ENDPOINTS ---
 # ==============================================================================
+# ... (All routes update_acceptance, get_case_data, hospital_dashboard remain unchanged) ...
 
 @hospital_app.route('/api/update_acceptance/<int:case_id>', methods=['POST'])
 def update_acceptance(case_id):
@@ -188,7 +182,6 @@ def get_case_data(case_id):
             "vitals_trend": vitals_trend,
             "acceptance_status": case.acceptance_status 
         }
-        
         return jsonify(data)
 
 # ==============================================================================
