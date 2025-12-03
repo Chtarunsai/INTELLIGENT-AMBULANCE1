@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Hospital Dashboard - Case {{ case_id }}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+    <style>
+        /* --- Custom CSS for New Light Theme and Card Styling --- */
+        :root {
+            --primary-blue: #007bff;
+            --light-bg: #e6f0ff; 
+            --card-bg: #ffffff; 
+            --text-dark: #1f2937; 
+            --border-light: #d0e0ff; 
+            --accent-green: #48c36b; 
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--light-bg);
+            color: var(--text-dark);
+            padding: 2rem;
+            min-height: 100vh;
+        }
+        .card {
+            background-color: var(--card-bg);
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05); 
+            border: 1px solid var(--border-light);
+            display: flex;
+            flex-direction: column;
+        }
+        .card-header-icon {
+            color: var(--primary-blue);
+            width: 1rem;
+            height: 1rem;
+        }
+        .vitals-value-box {
+            background-color: #f7f9ff; 
+            border-radius: 0.5rem;
+            padding: 0.75rem 1rem;
+            text-align: center;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #4b5563;
+        }
+        /* Top Status Cards */
+        .status-card-1 { border-left: 5px solid var(--primary-blue); }
+        .acceptance-status-box { background-color: #f97316; color: white; padding: 0.75rem; border-radius: 0.5rem; text-align: center; font-size: 1.25rem; font-weight: 700; }
+        .status-card-3 { background-color: #007bff; color: white; min-height: 150px; }
+        .status-card-3 .crew-text { color: #dbeaff; }
+        /* Smaller Vitals Cards */
+        .vitals-subtext { display: flex; justify-content: space-around; margin-top: 1rem; font-size: 0.75rem; color: #6b7280; }
+        /* Secondary Vitals Card */
+        .secondary-vitals-table { width: 100%; font-size: 0.9rem; color: #4b5563; }
+        .secondary-vitals-table th { text-align: left; font-weight: 600; padding-bottom: 0.5rem; }
+        .secondary-vitals-table td { text-align: right; font-weight: 700; }
+        /* Chart specific styling */
+        .chart-container {
+            position: relative;
+            height: 80px; 
+            width: 100%;
+            margin-top: 0.75rem;
+        }
+    </style>
+</head>
+<body 
+    data-case-id="{{ case_id }}" 
+    data-dashboard-url="{{ dashboard_url }}" 
+> 
+    <div class="max-w-7xl mx-auto">
+        <h1 class="text-3xl font-extrabold text-primary-blue mb-6 flex items-center">
+            <i class="fas fa-hospital-alt mr-3"></i> HOSPITAL PATIENT DATA
+        </h1>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+            <div class="card status-card-1 p-6">
+                <p class="text-sm font-semibold text-gray-500 mb-2">Case ID</p>
+                <p class="text-5xl font-extrabold text-primary-blue mt-3 mb-4" id="case-id-display">
+                    #{{ case_id }}
+                </p>
+            </div>
+
+            <div class="card p-6">
+                <div class="flex justify-between items-start mb-3">
+                    <p class="text-sm font-semibold text-gray-500">Hospital Action Status</p>
+                    <i data-lucide="info" class="card-header-icon"></i>
+                </div>
+                <p class="text-xs text-gray-600 mb-2">Facility: <span id="hospital-name-display-small">Loading...</span></p> 
+                
+                <div class="acceptance-status-box" id="acceptance-status-display">
+                    AWAITING RESPONSE
+                </div>
+                
+                <div class="flex justify-center space-x-4 mt-3 text-sm" id="acceptance-buttons">
+                    <button 
+                        class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded transition duration-150"
+                        onclick="sendAcceptanceUpdate('ACCEPTED')"
+                    >
+                        <i class="fas fa-check-circle mr-1"></i> Accept
+                    </button>
+                    <button 
+                        class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded transition duration-150"
+                        onclick="sendAcceptanceUpdate('REJECTED')"
+                    >
+                        <i class="fas fa-times-circle mr-1"></i> Reject
+                    </button>
+                </div>
+            </div>
+
+            <div class="card status-card-3 p-6">
+                <div class="flex justify-between items-start mb-3">
+                    <p class="text-sm font-semibold crew-text" id="hospital-name-display">Loading...</p>
+                    <p class="text-xs font-semibold crew-text">Crew Member:</p>
+                </div>
+                <p class="text-xl font-extrabold text-white mb-4">Receiving Facility</p>
+                <p class="text-xl font-extrabold text-white" id="crew-name">Loading...</p>
+                <p class="text-sm font-semibold crew-text mt-auto pt-4 border-t border-blue-400/50" id="origin-location">Origin: Loading...</p>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+
+            <div class="card">
+                <div class="flex justify-between items-start mb-3">
+                    <p class="text-sm font-semibold text-gray-500">Patient ID:</p>
+                    <i data-lucide="info" class="card-header-icon"></i>
+                </div>
+                <div class="vitals-value-box flex-grow flex items-center justify-center">
+                    <span id="patient-name">N/A</span>
+                </div>
+                <div class="flex justify-between space-x-2 mt-3 text-sm">
+                    <button class="text-primary-blue font-semibold">View History</button>
+                    <button class="text-gray-500 font-semibold">Confirm ID</button>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="flex justify-between items-start mb-3">
+                    <p class="text-sm font-semibold text-gray-500">Age:</p>
+                    <i data-lucide="info" class="card-header-icon"></i>
+                </div>
+                <div class="vitals-value-box flex-grow flex items-center justify-center">
+                    <span id="age">N/A</span>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="flex justify-between items-start mb-3">
+                    <p class="text-sm font-semibold text-gray-500">BP (Sys/Dias):</p>
+                    <i data-lucide="info" class="card-header-icon"></i>
+                </div>
+                <div class="vitals-value-box flex-grow flex items-center justify-center">
+                    <span id="bp-vitals">N/A</span>
+                </div>
+                <div class="chart-container">
+                    <canvas id="bpChart"></canvas>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="flex justify-between items-start mb-3">
+                    <p class="text-sm font-semibold text-gray-500">Ambulance ETA:</p>
+                    <i data-lucide="info" class="card-header-icon"></i>
+                </div>
+                <div class="vitals-value-box flex-grow flex items-center justify-center text-red-500">
+                    <span id="eta-min">N/A</span>
+                </div>
+                <div class="vitals-subtext">
+                    <span>GPS Live</span>
+                    <span>Traffic Check</span>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="flex justify-between items-start mb-3">
+                    <p class="text-sm font-semibold text-gray-500">Heart Rate:</p>
+                    <i data-lucide="info" class="card-header-icon"></i>
+                </div>
+                <div class="vitals-value-box flex-grow flex items-center justify-center">
+                    <span id="hr-vitals">N/A</span>
+                </div>
+                <div class="chart-container">
+                    <canvas id="hrChart"></canvas>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="flex justify-between items-start mb-3">
+                    <p class="text-sm font-semibold text-gray-500">O2 Saturation:</p>
+                    <i data-lucide="info" class="card-header-icon"></i>
+                </div>
+                <div class="vitals-value-box flex-grow flex items-center justify-center">
+                    <span id="o2-level">N/A</span>
+                </div>
+                <div class="chart-container">
+                    <canvas id="o2Chart"></canvas>
+                </div>
+            </div>
+
+        </div>
+        
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+            <div class="card lg:col-span-1">
+                <div class="flex justify-between items-start mb-3">
+                    <p class="text-sm font-semibold text-gray-500">AI Prediction:</p>
+                    <i data-lucide="info" class="card-header-icon"></i>
+                </div>
+                <p class="text-xl font-extrabold text-red-500 mb-2" id="ai-prediction">Loading...</p>
+                
+                <div class="flex justify-between items-center">
+                    <p class="text-sm font-semibold text-gray-500">Symptoms Text:</p>
+                    <i data-lucide="info" class="card-header-icon"></i>
+                </div>
+                <p class="text-sm text-gray-700" id="symptoms-text">N/A</p>
+            </div>
+
+            <div class="card lg:col-span-2">
+                <h3 class="text-lg font-bold text-gray-700 mb-4">Secondary Vitals</h3>
+                <table class="secondary-vitals-table">
+                    <tbody>
+                        <tr>
+                            <th>Oxygen Level:</th>
+                            <td id="o2-level-secondary">N/A</td> 
+                            <th>Time Received:</th>
+                            <td id="time-received">N/A</td>
+                        </tr>
+                        <tr>
+                            <th>Temp:</th>
+                            <td id="temp-vitals">N/A</td>
+                            <th>Resp. Rate:</th>
+                            <td id="rr-vitals">N/A</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+        </div>
+        
+        <div class="mt-6">
+            <div class="card">
+                <h3 class="text-xl font-bold text-primary-blue mb-4 flex items-center">
+                    <i class="fas fa-hospital-symbol mr-2"></i> Receiving Hospital Profile
+                </h3>
+                <p class="text-lg font-semibold text-gray-700 mb-3" id="profile-hospital-name">Loading...</p>
+                
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                    <div>
+                        <p class="text-gray-500">Facility Type:</p>
+                        <p class="font-bold text-gray-800" id="profile-facility-type">Loading...</p>
+                    </div>
+                    <div>
+                        <p class="text-gray-500">Bed Capacity:</p>
+                        <p class="font-bold text-gray-800" id="profile-bed-capacity">Loading...</p>
+                    </div>
+                    <div>
+                        <p class="text-gray-500">ICU Capacity:</p>
+                        <p class="font-bold text-gray-800" id="profile-icu-capacity">Loading...</p>
+                    </div>
+                    <div>
+                        <p class="text-gray-500">24/7 Services:</p>
+                        <p class="font-bold text-green-600" id="profile-24-7">Loading...</p>
+                    </div>
+                </div>
+                
+                <p class="text-sm text-gray-600 mt-4 border-t pt-3">
+                    <span id="profile-specialties">Loading key specialties...</span>
+                </p>
+            </div>
+        </div>
+
+
+    </div>
+
+    <script>
+        // --- READ VARIABLES SAFELY FROM DATA ATTRIBUTES ---
+        const bodyElement = document.body;
+        // The Python backend injects a dummy URL, but we must use the actual URL the browser is currently viewing (origin)
+        const DASHBOARD_URL = window.location.origin; 
+        const CASE_ID = parseInt(bodyElement.getAttribute('data-case-id'));
+        
+        let hrChartInstance = null;
+        let bpChartInstance = null;
+        let o2ChartInstance = null;
+
+        // ====================================================================
+        // --- CHART DRAWING FUNCTION ---
+        // ====================================================================
+        function drawVitalsChart(chartId, trendData, label, color) {
+            const ctx = document.getElementById(chartId).getContext('2d');
+            
+            let values;
+            if (chartId === 'hrChart') values = trendData.hr_trend;
+            else if (chartId === 'bpChart') values = trendData.bp_sys_trend;
+            else if (chartId === 'o2Chart') values = trendData.o2_trend;
+            else return;
+
+            const labels = trendData.time_labels;
+            
+            // Destroy existing chart instance if it exists
+            let chartInstance = null;
+            if (chartId === 'hrChart') { chartInstance = hrChartInstance; hrChartInstance = null; }
+            else if (chartId === 'bpChart') { chartInstance = bpChartInstance; bpChartInstance = null; }
+            else if (chartId === 'o2Chart') { chartInstance = o2ChartInstance; o2ChartInstance = null; }
+            
+            if (chartInstance) { chartInstance.destroy(); }
+
+            const newChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: label,
+                        data: values,
+                        borderColor: color,
+                        backgroundColor: color + '40', 
+                        tension: 0.3,
+                        pointRadius: 3,
+                        borderWidth: 2,
+                        fill: true,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { x: { display: false }, y: { display: false, beginAtZero: false } },
+                }
+            });
+
+            if (chartId === 'hrChart') { hrChartInstance = newChart; }
+            else if (chartId === 'bpChart') { bpChartInstance = newChart; }
+            else if (chartId === 'o2Chart') { o2ChartInstance = newChart; }
+        }
+
+        // ====================================================================
+        // --- HOSPITAL PROFILE DATA (Simulated) ---
+        // ====================================================================
+
+        const HOSPITAL_PROFILES = {
+            "SPARSH HOSPITAL": {
+                type: "Quaternary Care", beds: "300+", icu: "50+ Dedicated Beds", services: "Emergency, Diagnostic, Critical Care",
+                specialties: "Cardiac Sciences, Neurosciences, Orthopaedics, Organ Transplant"
+            },
+            "NAVYA MULTISPECIALITY HOSPITAL": {
+                 type: "Multi-Specialty", beds: "150+", icu: "15+ Dedicated Beds", services: "General ER, Diagnostics, General Surgery",
+                specialties: "General Surgery, Internal Medicine, Orthopaedics"
+            },
+            "N/A": {
+                type: "Unknown", beds: "N/A", icu: "N/A", services: "N/A", specialties: "Awaiting Facility Assignment"
+            }
+        };
+
+        function updateHospitalProfile(hospitalName) {
+            const normalizedName = hospitalName ? hospitalName.toUpperCase() : "N/A";
+            // Simple logic to pick profile, defaults to N/A if not exact match in this small list
+            // In real app, this comes from DB
+            const profile = HOSPITAL_PROFILES[normalizedName] || HOSPITAL_PROFILES["N/A"];
+
+            document.getElementById('profile-hospital-name').textContent = hospitalName || "N/A";
+            document.getElementById('profile-facility-type').textContent = profile.type;
+            document.getElementById('profile-bed-capacity').textContent = profile.beds;
+            document.getElementById('profile-icu-capacity').textContent = profile.icu;
+            document.getElementById('profile-24-7').textContent = profile.services;
+            
+            document.getElementById('profile-specialties').innerHTML = 
+                `<strong>Key Specialties for Referral:</strong> ${profile.specialties}.`;
+        }
+        
+        // ====================================================================
+        // --- HOSPITAL ACCEPTANCE LOGIC (CRITICAL REDIRECTION) ---
+        // ====================================================================
+
+        function updateStatusDisplay(newStatus) {
+            const displayElement = document.getElementById('acceptance-status-display');
+            const statusText = newStatus.replace('_', ' '); 
+            displayElement.textContent = statusText;
+            
+            if (newStatus === 'ACCEPTED') {
+                displayElement.style.backgroundColor = '#48c36b'; // Green
+                document.getElementById('acceptance-buttons').style.display = 'none'; // Hide buttons after acceptance
+            } else if (newStatus === 'REJECTED') {
+                displayElement.style.backgroundColor = '#dc2626'; // Red
+                document.getElementById('acceptance-buttons').style.display = 'none'; // Hide buttons after rejection
+            } else {
+                displayElement.style.backgroundColor = '#f97316'; // Orange/Default
+            }
+        }
+
+        async function sendAcceptanceUpdate(status) {
+            const url = `${DASHBOARD_URL}/api/update_acceptance/${encodeURIComponent(CASE_ID)}`;
+            
+            if (!confirm(`Are you sure you want to set status to ${status}?`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: status })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    console.log("Acceptance Status Updated:", result.new_status);
+                    updateStatusDisplay(result.new_status);
+                    
+                    // --- FIX: REDIRECTION LOGIC REMOVED ---
+                    // The client now only updates the status display, keeping the hospital on their dashboard.
+                    // --------------------------------------
+
+                } else {
+                    alert(`Error updating status: ${result.message}`);
+                }
+            } catch (err) {
+                console.error("Error communicating with server:", err);
+                alert("Network error. Could not update status.");
+            }
+        }
+
+
+        // ====================================================================
+        // --- DATA FETCHING FUNCTION ---
+        // ====================================================================
+        async function fetchCaseData(caseId, dashboardUrl) {
+            if (isNaN(caseId) || caseId < 1) { console.error("Error: Invalid Case ID."); return; }
+            
+            const url = `${dashboardUrl}/api/case_data/${encodeURIComponent(caseId)}`;
+            
+            try {
+                const response = await fetch(url);
+                if (!response.ok) { throw new Error(`API Status ${response.status}`); }
+                const data = await response.json();
+
+                if (!data.success) { throw new Error(data.message || 'Case Data Not Found'); }
+                
+                const vitals = data.patient_vitals || {};
+                const trends = data.vitals_trend || {}; 
+                const hospitalName = data.hospital_name || 'N/A';
+
+                // --- 1. Populate UI (Vitals & Status) ---
+                document.getElementById('case-id-display').textContent = `#${CASE_ID}`;
+                
+                document.getElementById('hospital-name-display').textContent = hospitalName;
+                document.getElementById('hospital-name-display-small').textContent = hospitalName;
+                
+                updateStatusDisplay(data.acceptance_status || 'AWAITING RESPONSE'); 
+                
+                document.getElementById('crew-name').textContent = data.crew_name || 'Crew: N/A';
+                document.getElementById('origin-location').textContent = `Origin: ${data.origin_address || 'N/A'}`;
+                document.getElementById('time-received').textContent = data.timestamp || 'N/A';
+                document.getElementById('patient-name').textContent = data.patient_name_display || 'N/A';
+                document.getElementById('eta-min').textContent = `${data.eta_min} mins` || 'N/A';
+                
+                document.getElementById('age').textContent = vitals.age ?? 'N/A';
+                document.getElementById('o2-level').textContent = vitals.o2 ?? 'N/A';
+                document.getElementById('o2-level-secondary').textContent = vitals.o2 ?? 'N/A';
+                document.getElementById('bp-vitals').textContent = vitals.bp ?? 'N/A';
+                document.getElementById('temp-vitals').textContent = vitals.temp ?? 'N/A';
+                document.getElementById('hr-vitals').textContent = vitals.hr ?? 'N/A';
+                document.getElementById('rr-vitals').textContent = vitals.rr ?? 'N/A';
+
+                document.getElementById('ai-prediction').textContent = data.ai_prediction || 'Loading...';
+                document.getElementById('symptoms-text').textContent = data.symptoms_text || 'N/A';
+                
+                // --- 2. Call Hospital Profile Update ---
+                updateHospitalProfile(hospitalName);
+
+
+                // --- 3. Draw Charts ---
+                if (trends.hr_trend && trends.time_labels) {
+                    drawVitalsChart('hrChart', trends, 'Heart Rate', '#f97316'); 
+                }
+                if (trends.o2_trend && trends.time_labels) {
+                    drawVitalsChart('o2Chart', trends, 'O2 Sat', '#10b981'); 
+                }
+                if (trends.bp_sys_trend && trends.time_labels) {
+                    drawVitalsChart('bpChart', trends, 'BP (Sys)', '#3b82f6'); 
+                }
+
+                if (window.lucide && typeof lucide.createIcons === 'function') {
+                    lucide.createIcons();
+                }
+
+                const triage = data.triage_status || 'Status';
+                document.title = `Hospital Dashboard - ${hospitalName} (${triage})`;
+                
+            } catch (err) {
+                console.error("Fetch/Processing Error:", err);
+            }
+        }
+
+        // Initialize on DOMContentLoaded
+        document.addEventListener('DOMContentLoaded', () => {
+            if (window.lucide && typeof lucide.createIcons === 'function') {
+                lucide.createIcons();
+            }
+            fetchCaseData(CASE_ID, DASHBOARD_URL).catch(err => {
+                console.error("Unexpected error during fetch process:", err);
+            });
+        });
+    </script>
+</body>
+</html>

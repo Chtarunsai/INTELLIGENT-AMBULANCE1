@@ -1,0 +1,1150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>AI Emergency Response - Ambulance Client</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+
+    <style>
+/* ===== Modern Glassmorphism Theme for AI Ambulance UI ===== */
+:root{
+  --glass-bg: rgba(255,255,255,0.04);
+  --glass-strong: rgba(255,255,255,0.06);
+  --glass-weak: rgba(255,255,255,0.02);
+  --accent: #6f44ff;        /* purple accent */
+  --accent-2: #00d09c;      /* green accent */
+  --danger: #ef4444;        /* red */
+  --warn: #f59e0b;          /* yellow/orange */
+  --muted: rgba(255,255,255,0.65);
+  --card-radius: 14px;
+  --glass-border: rgba(255,255,255,0.08);
+  --shadow-1: 0 6px 18px rgba(8,15,25,0.55);
+  --shadow-2: 0 10px 30px rgba(11,22,40,0.6);
+  --glass-stroke: linear-gradient(90deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+}
+
+/* base */
+html,body{height:100%;}
+body {
+  font-family: 'Inter', system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  margin:0;
+  background: radial-gradient(1200px 600px at 10% 10%, rgba(100,90,255,0.08), transparent 10%),
+              radial-gradient(900px 450px at 90% 90%, rgba(255,60,80,0.04), transparent 15%),
+              #0f1724; /* deep background */
+  color: #e6eef8;
+  -webkit-font-smoothing:antialiased;
+  -moz-osx-font-smoothing:grayscale;
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  padding-bottom: 60px;
+}
+
+/* header */
+header.bg-header-bg {
+  background: linear-gradient(180deg, rgba(12,18,28,0.72), rgba(8,12,20,0.55));
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+/* Generic card used across the app */
+.card {
+  background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+  border-radius: var(--card-radius);
+  border: 1px solid var(--glass-border);
+  padding: 1.5rem;
+  box-shadow: var(--shadow-1), 0 1px 0 rgba(255,255,255,0.02) inset;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transition: transform .18s cubic-bezier(.2,.9,.2,1), box-shadow .18s ease;
+}
+.card:hover{
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-2);
+}
+
+/* Recommendation card (accented left border like original) */
+.rec-card {
+  background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+  border-radius: var(--card-radius);
+  padding: 1.5rem;
+  border-left: 6px solid var(--accent);
+  box-shadow: var(--shadow-1);
+  color: var(--muted);
+}
+
+/* Title styles */
+h1, h2 { color: #ffffff; }
+.text-primary { color: var(--accent); }
+
+/* Inputs */
+.vitals-input, #location-input, .auth-input, #symptoms-text, textarea {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.06);
+  color: #e6eef8;
+  padding: .6rem .8rem;
+  border-radius: 10px;
+  outline: none;
+  transition: box-shadow .14s ease, border-color .14s ease, transform .12s ease;
+  width:100%;
+  box-sizing: border-box;
+  font-size: .95rem;
+}
+.vitals-input::placeholder, .auth-input::placeholder { color: rgba(230,238,248,0.45); }
+.vitals-input:focus, .auth-input:focus, #location-input:focus, textarea:focus {
+  border-color: rgba(111,68,255,0.9);
+  box-shadow: 0 6px 18px rgba(111,68,255,0.08);
+  transform: translateY(-1px);
+}
+
+/* Buttons / CTA */
+button {
+  cursor: pointer;
+  border: none;
+  outline: none;
+}
+.btn-primary {
+  background: linear-gradient(90deg, var(--accent-2), var(--accent));
+  color: white;
+  padding: .8rem 1.2rem;
+  border-radius: 12px;
+  font-weight:700;
+  box-shadow: 0 6px 18px rgba(111,68,255,0.12);
+  transition: transform .12s ease, box-shadow .12s ease, opacity .12s ease;
+}
+.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(111,68,255,0.18); }
+button.bg-yellow-500 {
+  background: linear-gradient(90deg, #ffcc33, #f59e0b);
+  color: #111827;
+  border-radius: 12px;
+  box-shadow: 0 6px 18px rgba(245,158,11,0.12);
+}
+button.bg-red-600 {
+  background: linear-gradient(90deg, #ff6b6b, #ef4444);
+  border-radius: 12px;
+}
+
+/* Analyze button emphasis */
+#analyze-button {
+  min-width: 260px;
+  font-size: 1rem;
+}
+
+/* Small helper text */
+.text-muted { color: rgba(230,238,248,0.55); }
+
+/* Log area / console */
+#text-log {
+  background: rgba(3,6,12,0.35);
+  border: 1px solid rgba(255,255,255,0.04);
+  color: #cfe8ff;
+  border-radius: 10px;
+  font-family: 'Roboto Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, "Courier New", monospace;
+  font-size: .9rem;
+}
+
+/* Symptoms Panel — pill style items */
+.symptoms-panel {
+  background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+  border-radius: 12px;
+  padding: 1.25rem;
+  border: 1px solid rgba(255,255,255,0.04);
+  display:block;
+}
+.symptoms-panel h3 { color: #ffb3b3; }
+#symptoms-checkbox-grid {
+  gap: .75rem;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0,1fr));
+}
+.symptom-item {
+  display:flex;
+  align-items:center;
+  gap:.75rem;
+  background: linear-gradient(90deg, rgba(255,255,255,0.01), rgba(255,255,255,0.015));
+  padding: .8rem 1rem;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.03);
+  color: var(--muted);
+  transition: transform .12s ease, background .12s ease, box-shadow .12s ease;
+  cursor:pointer;
+  user-select:none;
+}
+.symptom-item:hover { transform: translateY(-3px); box-shadow: 0 8px 20px rgba(0,0,0,0.5); }
+.symptom-item .checkbox { font-size: .95rem; color: rgba(255,255,255,0.75); }
+
+/* checked state */
+.symptom-item.checked {
+  background: linear-gradient(90deg, rgba(255,255,255,0.02), rgba(111,68,255,0.04));
+  border: 1px solid rgba(111,68,255,0.3);
+  box-shadow: 0 8px 30px rgba(111,68,255,0.08);
+  color: #ffffff;
+}
+.symptom-item.checked .checkbox { color: var(--accent-2); }
+
+/* Danger-highlighted symptom (Severe Bleeding) — can be toggled by your JS class */
+.symptom-item.danger, .symptom-item.checked.danger {
+  background: linear-gradient(90deg, rgba(255,80,80,0.14), rgba(255,50,50,0.06));
+  border: 1px solid rgba(255,80,80,0.2);
+  color: #fff;
+}
+.symptom-item.danger .checkbox { color: #ffdfdf; }
+
+/* Recommendation table */
+.rec-table th { color: rgba(255,255,255,0.6); padding-right: 1rem; width: 160px; font-weight:600; }
+.rec-table td { color: rgba(255,255,255,0.95); }
+
+/* small utility classes */
+.font-mono { font-family: 'Roboto Mono', monospace; }
+.hidden { display:none !important; }
+
+/* responsive tweaks */
+@media (max-width: 900px){
+  #symptoms-checkbox-grid { grid-template-columns: 1fr; }
+  .card { padding: 1rem; }
+  header { padding: .75rem 1rem; }
+}
+
+/* subtle decorative rim/glow */
+body:before {
+  content: "";
+  position: fixed;
+  inset: -20%;
+  background: radial-gradient(1200px 400px at 10% 10%, rgba(111,68,255,0.06), transparent 10%),
+              radial-gradient(900px 400px at 90% 90%, rgba(255,60,80,0.04), transparent 15%);
+  pointer-events:none;
+  mix-blend-mode: screen;
+}
+    </style>
+</head>
+<body class="min-h-screen">
+    <div id="app" class="flex flex-col min-h-screen"></div>
+
+<script>
+    // --- INJECT DATA FROM FLASK BACKEND (keep this placeholder) ---
+    const PRELOADED_CASE_DATA = {{ case_data | tojson | safe }};
+
+    // --- GLOBAL STATE ---
+    let IS_AUTHENTICATED = false;
+    let IS_REGISTER_MODE = false;
+    let RECOMMENDED_HOSPITAL_LOCATION = null;
+    let RECOMMENDED_HOSPITAL_NAME = null;
+    let PATIENT_CASE_count = 0;
+    let REGISTERED_USERS_COUNT = 0;
+    let CURRENT_PATIENT_VITALS = null;
+    let CURRENT_PATIENT_ANALYSIS = null;
+    let NEWLY_CREATED_CASE_ID = null;
+    const HOSPITAL_DASHBOARD_PORT = 5001;
+    const API_URL = window.location.origin;
+    let statusPollingInterval = null;
+
+    const EXAMPLE_VITALS = {
+        "Age": "",
+        "Blood Pressure (systolic)": "",
+        "Blood Pressure (diastolic)": "",
+        "Heart Rate (bpm)": "",
+        "Oxygen Level (%)": "",
+        "Temperature (F)": "",
+        "Respiratory Rate (breaths/min)": "",
+        "patient_name": ""
+    };
+
+    const SYMPTOMS_LIST = [
+        'Chest Pain', 'Breathing Difficulty',
+        'Unconscious', 'Severe Bleeding',
+        'Fracture/Trauma', 'Seizure',
+        'Stroke Symptoms', 'Severe Pain'
+    ];
+
+    // ---------------- Helper: API fetch ----------------
+    async function api_fetch(endpoint, method = 'GET', data = null) {
+        const options = { method: method, headers: { 'Content-Type': 'application/json' } };
+        if (data) options.body = JSON.stringify(data);
+        try {
+            const res = await fetch(`${API_URL}${endpoint}`, options);
+            const text = await res.text();
+            let parsed;
+            try { parsed = text ? JSON.parse(text) : {}; } catch (e) { parsed = { message: text || 'No JSON returned' }; }
+            return { success: res.ok, data: parsed };
+        } catch (err) {
+            return { success: false, data: { message: 'Network error or server unreachable.' } };
+        }
+    }
+
+    // ---------------- Geolocation ----------------
+    function updateLocationLabel(text) {
+        const label = document.getElementById('location-input');
+        if (label) label.value = text;
+    }
+
+    function getAmbulanceLocation() {
+        updateLocationLabel('Fetching location...');
+        if (!navigator.geolocation) {
+            updateLocationLabel('Geolocation not supported. Please enter address manually.');
+            return;
+        }
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                const lat = position.coords.latitude;
+                const lon = position.coords.longitude;
+                updateLocationLabel(`Lat/Lon: ${lat.toFixed(5)},${lon.toFixed(5)}`);
+            },
+            (error) => {
+                let msg = 'Location access denied or timed out.';
+                if (error.code === 1) { msg = 'Location permission denied.'; }
+                else if (error.code === 2) { msg = 'Location unavailable.'; }
+                else if (error.code === 3) { msg = 'Location request timed out.'; }
+                updateLocationLabel(msg);
+                console.error('Geolocation Error:', error);
+            },
+            { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+        );
+    }
+
+    // ---------------- Auth & Login UI ----------------
+    function setupLoginKeyboardNavigation() {
+        const inputs = [
+            document.getElementById('crew_name'),
+            document.getElementById('hospital_name'),
+            document.getElementById('hospital_id'),
+            document.getElementById('password')
+        ].filter(el => el);
+
+        const actionButton = document.getElementById('action-button');
+
+        inputs.forEach((input, index) => {
+            input.classList.add('auth-input');
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (index < inputs.length - 1) inputs[index + 1].focus();
+                    else if (actionButton) actionButton.focus();
+                }
+            });
+        });
+
+        if (actionButton) {
+            actionButton.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') { e.preventDefault(); handleAuth(); }
+            });
+        }
+    }
+
+    function renderLogin() {
+        const hospitalFields = IS_REGISTER_MODE ? `
+            <div>
+                <label class="block text-sm font-semibold text-gray-300 mb-1 flex items-center">
+                    <i data-lucide="hospital" class="w-4 h-4 mr-2"></i> Hospital Name
+                </label>
+                <input type="text" id="hospital_name" class="auth-input w-full p-2">
+            </div>
+            <div>
+                <label class="block text-sm font-semibold text-gray-300 mb-1 flex items-center">
+                    <i data-lucide="scan-text" class="w-4 h-4 mr-2"></i> Hospital ID (E.g., BGL560)
+                </label>
+                <input type="text" id="hospital_id" class="auth-input w-full p-2">
+            </div>
+        ` : '';
+
+        const appEl = document.getElementById('app');
+        if (!appEl) return;
+
+        appEl.innerHTML = `
+            <div class="flex flex-col items-center justify-center min-h-screen p-4">
+                <div class="card p-8 w-full max-w-md">
+                    <h2 class="text-3xl font-extrabold text-white mb-1">
+                        <i data-lucide="siren" class="inline-block w-8 h-8 mr-1 text-red-400"></i> AI Ambulance System
+                    </h2>
+                    <p id="action-title" class="text-center text-gray-400 mb-8 font-semibold">
+                        ${IS_REGISTER_MODE ? 'New Crew Registration' : 'Log In to Access Patient Vitals & Routing'}
+                    </p>
+
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-300 mb-1 flex items-center">
+                                <i data-lucide="user" class="w-4 h-4 mr-2"></i> Crew Name (Unique ID)
+                            </label>
+                            <input type="text" id="crew_name" class="auth-input w-full p-2">
+                        </div>
+                        ${hospitalFields}
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-300 mb-1 flex items-center">
+                                <i data-lucide="lock" class="w-4 h-4 mr-2"></i> Password
+                            </label>
+                            <input type="password" id="password" class="auth-input w-full p-2">
+                        </div>
+                    </div>
+
+                    <button id="action-button" class="w-full p-3 mt-8 rounded-lg font-bold text-white btn-primary" onclick="handleAuth()">
+                        ${IS_REGISTER_MODE ? 'REGISTER & SIGN IN' : 'LOG IN TO SYSTEM'}
+                    </button>
+
+                    <p id="status-label" class="text-center text-sm mt-4 font-bold text-red-400 h-5">
+                        ${IS_REGISTER_MODE ? 'Status: Please register first.' : ''}
+                    </p>
+
+                    <div class="flex justify-center space-x-4 mt-6">
+                        <button onclick="alert('Password reset is simulated. Check registered email.')" class="text-sm text-gray-400 hover:text-white underline">Forgot Password?</button>
+                        <button onclick="switchMode()" class="text-sm text-gray-400 hover:text-white underline font-semibold">
+                            ${IS_REGISTER_MODE ? 'Switch to Log In' : 'Need Access? Register Here'}
+                        </button>
+                    </div>
+                </div>
+                <footer class="text-sm text-gray-400 mt-4 text-center">© 2025 Intelligent Ambulance Network</footer>
+            </div>
+        `;
+
+        lucide.createIcons();
+        setupLoginKeyboardNavigation();
+    }
+
+    function switchMode() {
+        IS_REGISTER_MODE = !IS_REGISTER_MODE;
+        renderLogin();
+    }
+
+    async function handleAuth() {
+        const crew_name_el = document.getElementById('crew_name');
+        const password_el = document.getElementById('password');
+        const statusLabel = document.getElementById('status-label');
+
+        const crew_name = crew_name_el ? crew_name_el.value.trim() : '';
+        const password = password_el ? password_el.value.trim() : '';
+
+        if (statusLabel) {
+            statusLabel.textContent = '';
+            statusLabel.classList.remove('text-green-400', 'text-red-400');
+            statusLabel.classList.add('text-red-400');
+        }
+
+        if (!crew_name || !password) {
+            if (statusLabel) statusLabel.textContent = "ERROR: Crew Name and Password must be filled.";
+            return;
+        }
+
+        const endpoint = IS_REGISTER_MODE ? '/api/register' : '/api/login';
+        const authData = { crew_name: crew_name, password: password };
+
+        if (IS_REGISTER_MODE) {
+            const hospital_name_el = document.getElementById('hospital_name');
+            const hospital_id_el = document.getElementById('hospital_id');
+
+            if (!hospital_name_el || !hospital_id_el) {
+                if (statusLabel) statusLabel.textContent = "ERROR: Hospital Name and ID inputs are missing in the DOM.";
+                return;
+            }
+
+            if (!hospital_name_el.value.trim() || !hospital_id_el.value.trim()) {
+                if (statusLabel) statusLabel.textContent = "ERROR: Hospital Name and ID are required for registration.";
+                return;
+            }
+            authData.hospital_name = hospital_name_el.value.trim();
+            authData.hospital_id = hospital_id_el.value.trim();
+        }
+
+        const { success, data } = await api_fetch(endpoint, 'POST', authData);
+
+        if (success) {
+            if (statusLabel) {
+                statusLabel.textContent = data.message || 'Success';
+                statusLabel.classList.remove('text-red-400');
+                statusLabel.classList.add('text-green-400');
+            }
+
+            if (!IS_REGISTER_MODE) localStorage.setItem('crewName', crew_name);
+
+            if (IS_REGISTER_MODE) {
+                setTimeout(() => { IS_REGISTER_MODE = false; renderLogin(); }, 500);
+            } else {
+                IS_AUTHENTICATED = true;
+                await fetchDatabaseMetrics();
+                renderMainApp();
+            }
+        } else {
+            if (statusLabel) statusLabel.textContent = `ERROR: ${data?.message || 'Auth failed'}`;
+        }
+    }
+
+    async function fetchDatabaseMetrics() {
+        const { success, data } = await api_fetch('/api/metrics');
+        if (success) {
+            PATIENT_CASE_count = data.patient_count || 0;
+            REGISTERED_USERS_COUNT = data.user_count || 0;
+            updateLog(`Metrics fetched: ${PATIENT_CASE_count} cases, ${REGISTERED_USERS_COUNT} registered users.`, true);
+        } else {
+            updateLog(`Failed to fetch database metrics.`, true);
+        }
+    }
+
+    // ---------------- Symptoms Panel ----------------
+    function toggleSymptom(element) {
+        element.classList.toggle('checked');
+        element.classList.toggle('danger'); // allow toggling danger to show highlight
+        const checkbox = element.querySelector('.checkbox');
+        const input = element.querySelector('input[type="checkbox"]');
+
+        if (element.classList.contains('checked')) {
+            checkbox.classList.remove('fa-square');
+            checkbox.classList.add('fa-check-square');
+            if (input) input.checked = true;
+        } else {
+            checkbox.classList.remove('fa-check-square');
+            checkbox.classList.add('fa-square');
+            if (input) input.checked = false;
+        }
+    }
+
+    function renderSymptomsPanel() {
+        let html = `
+            <div class="symptoms-panel mt-6">
+                <h3 class="text-xl font-bold text-red-400 mb-4 flex items-center">
+                    <i class="fas fa-clock w-5 h-5 mr-2"></i> Symptoms Observer Panel 
+                </h3>
+                <div class="grid grid-cols-2 gap-4" id="symptoms-checkbox-grid">
+        `;
+
+        SYMPTOMS_LIST.forEach((symptom) => {
+            const isChecked = symptom === 'Severe Bleeding'; 
+            // default visual 'danger' on Severe Bleeding
+            const checkedClass = isChecked ? 'checked danger' : (symptom === 'Severe Bleeding' ? 'danger' : '');
+            const iconClass = isChecked ? 'fa-check-square' : 'fa-square';
+
+            html += `
+                <div class="symptom-item flex items-center space-x-3 ${checkedClass}" onclick="toggleSymptom(this)">
+                    <i class="fas ${iconClass} checkbox text-green-400"></i>
+                    <span class="font-semibold text-sm">${symptom}</span>
+                    <input type="checkbox" name="symptom" value="${symptom}" class="hidden" ${isChecked ? 'checked' : ''}>
+                </div>
+            `;
+        });
+
+        html += `
+                </div>
+            </div>
+        `;
+        return html;
+    }
+
+    // ---------------- Polling for hospital response ----------------
+    function startStatusPolling(caseId, currentHospitalName) {
+        if (statusPollingInterval) clearInterval(statusPollingInterval);
+
+        statusPollingInterval = setInterval(async () => {
+            const result = await api_fetch(`/api/get_case_status/${caseId}`, 'GET');
+            const status = result.success ? result.data.status : 'AWAITING RESPONSE';
+            const messageElement = document.getElementById('suggestionMessage');
+            const hospitalLabel = document.getElementById('hospital-label');
+
+            if (status === 'AWAITING RESPONSE' || status === 'NOT_FOUND') return;
+
+            if (messageElement) {
+                messageElement.classList.remove('hidden', 'text-yellow-400');
+
+                if (status === 'ACCEPTED') {
+                    messageElement.innerHTML = `✅ **HOSPITAL ACCEPTED!** Route to ${currentHospitalName} is confirmed.`;
+                    messageElement.style.color = 'var(--accent-2)';
+                    hospitalLabel.innerHTML = `✅ Confirmed | Hospital: ${currentHospitalName}`;
+                    clearInterval(statusPollingInterval);
+                } else if (status === 'REJECTED') {
+                    messageElement.innerHTML = `🛑 **HOSPITAL REJECTED!** Click DIVERT to find alternative.`;
+                    messageElement.style.color = 'var(--danger)';
+                    hospitalLabel.innerHTML = `🚨 CRITICAL | Hospital: Rerouting needed.`;
+                    clearInterval(statusPollingInterval);
+                }
+            }
+        }, 5000);
+    }
+
+    // ---------------- Main App render ----------------
+    function setupMainAppKeyboardNavigation() {
+        const form = document.getElementById('vitals-form');
+        if (!form) return;
+
+        const inputElements = Array.from(form.querySelectorAll('.vitals-input, #patient_name, #symptoms-text')).filter(el => {
+            return el.type !== 'hidden' && !el.disabled;
+        });
+
+        const actionButtons = [
+            document.getElementById('analyze-button'),
+            document.getElementById('btnAcknowledge'),
+            document.getElementById('btnStartNavigation'),
+            document.getElementById('btnNewCase')
+        ].filter(el => el);
+
+        const moveToNextElement = (currentIndex, elements) => {
+            if (currentIndex < elements.length - 1) elements[currentIndex + 1].focus();
+            else if (actionButtons.length > 0) actionButtons[0].focus();
+        };
+
+        inputElements.forEach((input, index) => {
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    moveToNextElement(index, inputElements);
+                }
+            });
+        });
+
+        actionButtons.forEach((button) => {
+            button.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && !button.disabled) {
+                    e.preventDefault();
+                    button.click();
+                }
+            });
+        });
+    }
+
+    function renderMainApp() {
+        document.title = "AI Emergency Response - Ambulance Client";
+        const appEl = document.getElementById('app');
+        if (!appEl) return;
+
+        appEl.innerHTML = `
+            <header class="bg-header-bg shadow-lg p-4 md:px-8 flex flex-col md:flex-row justify-between items-center text-white">
+                <div class="flex flex-col items-center md:items-start">
+                    <h1 class="text-2xl md:text-3xl font-extrabold">AI Emergency Response</h1>
+                    <p class="text-sm md:text-base font-light opacity-80">Intelligent Ambulance Management System</p>
+                </div>
+
+                <div class="mt-2 md:mt-0 text-right">
+                    <div class="flex items-center justify-end space-x-2">
+                        <input type="text" id="location-input" value="Click 'Get Location' or enter address..." placeholder="Enter Current Location Address" class="text-sm p-1 rounded-md w-64">
+                        <button onclick="getAmbulanceLocation()" class="bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-bold py-1 px-2 rounded-md flex items-center">
+                            <i data-lucide="locate-fixed" class="w-4 h-4 mr-1"></i> Get Location
+                        </button>
+                    </div>
+                    <p class="text-xs mt-1 text-gray-400 text-right">Current Location (Origin)</p>
+                </div>
+            </header>
+
+            <main class="p-4 md:p-8 flex-grow">
+
+                <div id="hospitalRecommendationSection" class="rec-card p-6 md:p-8 mb-8" style="display:none;">
+                    <h2 class="text-xl md:text-2xl font-bold text-red-400 mb-3 flex items-center">
+                        <i class="fas fa-hospital-symbol mr-2"></i> HOSPITAL RECOMMENDATION
+                    </h2>
+                    <div id="recommendationDetails"></div>
+                    
+                    <p class="text-base text-gray-300 mt-4 mb-3 font-semibold">
+                        <i data-lucide="send" class="inline-block w-4 h-4 mr-2"></i>
+                        Send patient data to the selected hospital:
+                    </p>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6">
+                        <button id="btnAcknowledge" onclick="handleAcknowledge()" class="flex items-center justify-center p-3 rounded-xl font-bold transition duration-200 bg-red-600 hover:bg-red-700 text-white shadow-md disabled:opacity-50" disabled>
+                            <i data-lucide="alert-circle" class="w-5 h-5 mr-2"></i> Send Alert to Hospital
+                        </button>
+                        <button id="btnStartNavigation" onclick="handleStartNavigation()" class="flex items-center justify-center p-3 rounded-xl font-bold transition duration-200 btn-primary hover:bg-primary text-white shadow-md disabled:opacity-50" disabled>
+                            <i data-lucide="route" class="w-5 h-5 mr-2"></i> Start Navigation
+                        </button>
+                        
+                        <button id="handleDivertClick" onclick="findAlternativeHospital()" class="flex items-center justify-center p-3 rounded-xl font-bold transition duration-200 bg-orange-500 hover:bg-orange-600 text-white shadow-md disabled:opacity-50" disabled>
+                            <i data-lucide="x-circle" class="w-5 h-5 mr-2"></i> Not Accepting / Divert
+                        </button>
+
+                        <button id="btnNewCase" onclick="handleNewCase()" class="flex items-center justify-center p-3 rounded-xl font-bold transition duration-200 bg-gray-500 hover:bg-gray-600 text-white shadow-md disabled:opacity-50" disabled>
+                            <i data-lucide="plus-circle" class="w-5 h-5 mr-2"></i> New Case
+                        </button>
+                    </div>
+                    <p id="suggestionMessage" class="text-sm text-center text-yellow-400 font-semibold mt-4 hidden">Searching for alternatives...</p>
+                </div>
+
+                <div id="hospitalDashboardContainer" style="display:none;"></div> 
+                
+                <div class="card p-6 md:p-8 mb-8 shadow-lg shadow-primary/50">
+                    <h2 class="text-xl md:text-2xl font-bold text-primary mb-6 border-b border-gray-600 pb-2">
+                        <i data-lucide="activity" class="inline-block w-6 h-6 mr-2"></i>Patient Vitals & Symptoms Entry
+                    </h2>
+
+                    <form id="vitals-form" class="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-4">
+                        <div class="col-span-1">
+                            <label class="block text-sm font-semibold text-gray-300 mt-2">Patient Name</label>
+                            <input type="text" id="patient_name" value="${EXAMPLE_VITALS.patient_name}" class="vitals-input">
+                        </div>
+                        <div class="col-span-1">
+                            <label class="block text-sm font-semibold text-gray-300 mt-2">
+                                Age (years)
+                                <span class="text-xs font-normal text-gray-400">(Critical Alert for &gt; 75)</span>
+                            </label>
+                            <input type="number" id="Age" placeholder="${EXAMPLE_VITALS.Age}" class="vitals-input">
+                        </div>
+                        <div class="col-span-1">
+                            <label class="block text-sm font-semibold text-primary mt-2">
+                                BP (Systolic)
+                                <span class="text-xs font-normal text-gray-400">(Range: 90 – 160 mmHg)</span>
+                            </label>
+                            <input type="number" id="Blood_Pressure_(systolic)" placeholder="${EXAMPLE_VITALS["Blood Pressure (systolic)"]}" class="vitals-input">
+                        </div>
+
+                        <div class="col-span-1">
+                            <label class="block text-sm font-semibold text-primary mt-2">
+                                BP (Diastolic)
+                                <span class="text-xs font-normal text-gray-400">(Range: 60 – 100 mmHg)</span>
+                            </label>
+                            <input type="number" id="Blood_Pressure_(diastolic)" placeholder="${EXAMPLE_VITALS["Blood Pressure (diastolic)"]}" class="vitals-input">
+                        </div>
+                        <div class="col-span-1">
+                            <label class="block text-sm font-semibold text-primary mt-2">
+                                Heart Rate (bpm)
+                                <span class="text-xs font-normal text-red-400">
+                                    (Range: 60 – 100 bpm)
+                                </span>
+                            </label>
+                            <input type="number" id="Heart_Rate_(bpm)" placeholder="${EXAMPLE_VITALS["Heart Rate (bpm)"]}" class="vitals-input">
+                        </div>
+                        <div class="col-span-1">
+                            <label class="block text-sm font-semibold text-primary mt-2">
+                                Oxygen Level (%)
+                                <span class="text-xs font-normal text-red-400">
+                                    (Range: 94% – 100%)
+                                </span>
+                            </label>
+                            <input type="number" id="Oxygen_Level_(%)" placeholder="${EXAMPLE_VITALS["Oxygen Level (%)"]}" class="vitals-input">
+                        </div>
+
+                        <div class="col-span-1">
+                            <label class="block text-sm font-semibold text-primary mt-2">
+                                Temperature (F)
+                                <span class="text-xs font-normal text-gray-400">(Range: 95.0 – 101.0 °F)</span>
+                            </label>
+                            <input type="number" id="Temperature_(F)" placeholder="${EXAMPLE_VITALS["Temperature (F)"]}" class="vitals-input">
+                        </div>
+                        <div class="col-span-1">
+                            <label class="block text-sm font-semibold text-primary mt-2">
+                                Resp. Rate (breaths/min)
+                                <span class="text-xs font-normal text-gray-400">(Range: 10 – 24 breaths/min)</span>
+                            </label>
+                            <input type="number" id="Respiratory_Rate_(breaths/min)" placeholder="${EXAMPLE_VITALS["Respiratory Rate (breaths/min)"]}" class="vitals-input">
+                        </div>
+                        <div class="col-span-1"></div>
+
+                        <div class="col-span-1 md:col-span-3">
+                            ${renderSymptomsPanel()} </div>
+                        
+                        <div class="col-span-1 md:col-span-3">
+                            <label class="block text-sm font-semibold text-gray-300 mt-2">Detailed Symptoms/Notes</label>
+                            <textarea id="symptoms-text" rows="3" class="w-full p-2 font-mono text-sm">Patient is conscious, minor chest discomfort reported. Complains of shortness of breath.</textarea>
+                        </div>
+
+                        <div class="col-span-1 md:col-span-3 pt-4">
+                            <p id="hospital-label" class="text-lg font-bold text-gray-300">Status: Ready. Get location, enter vitals, and Analyze.</p>
+                        </div>
+                    </form>
+
+                    <div class="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <button id="analyze-button" onclick="analyzePatientCondition()" class="flex items-center justify-center p-3 rounded-xl font-bold transition duration-200 bg-yellow-500 hover:bg-yellow-600 text-gray-900 shadow-md">
+                            <i data-lucide="search" class="w-5 h-5 mr-2"></i>1. Analyze Patient Condition
+                        </button>
+                    </div>
+                </div>
+
+                <div class="card p-6 md:p-8 shadow-lg shadow-primary/50">
+                    <h2 class="text-xl md:text-2xl font-bold text-primary mb-4 border-b border-gray-600 pb-2">
+                        <i data-lucide="book-open" class="inline-block w-6 h-6 mr-2"></i>AI Analysis Output & Route Recommendation Log
+                    </h2>
+                    <textarea id="text-log" rows="8" class="w-full p-3 font-mono text-sm text-gray-300" readonly>Welcome to the Intelligent Ambulance Web Client.
+Click 'Get Location' to minimize risk to the patient before analyzing vitals.
+</textarea>
+                </div>
+            </main>
+        `;
+
+        window.toggleSymptom = toggleSymptom;
+        lucide.createIcons();
+        fetchDatabaseMetrics();
+        getAmbulanceLocation();
+        setupMainAppKeyboardNavigation();
+
+        if (PRELOADED_CASE_DATA) {
+            console.log("Restoring Patient Data...", PRELOADED_CASE_DATA);
+            NEWLY_CREATED_CASE_ID = PRELOADED_CASE_DATA.id;
+            RECOMMENDED_HOSPITAL_NAME = PRELOADED_CASE_DATA.hospital_name;
+            if (PRELOADED_CASE_DATA.vitals_details) {
+                const v = PRELOADED_CASE_DATA.vitals_details;
+                const setVal = (id, val) => { const el = document.getElementById(id); if(el) el.value = val; };
+                setVal('patient_name', "Patient #" + PRELOADED_CASE_DATA.id);
+                setVal('Age', v.age);
+                setVal('Blood_Pressure_(systolic)', v.bp_sys);
+                setVal('Blood_Pressure_(diastolic)', v.bp_dias);
+                setVal('Heart_Rate_(bpm)', v.hr);
+                setVal('Oxygen_Level_(%)', v.o2);
+                setVal('Temperature_(F)', v.temp);
+                setVal('Respiratory_Rate_(breaths/min)', v.rr);
+            }
+            updateLocationLabel(PRELOADED_CASE_DATA.origin_address);
+            if (PRELOADED_CASE_DATA.symptoms_snapshot) {
+                const symptomsEl = document.getElementById('symptoms-text');
+                if (symptomsEl) symptomsEl.value = PRELOADED_CASE_DATA.symptoms_snapshot;
+            }
+            const hospitalLabel = document.getElementById('hospital-label');
+            if (hospitalLabel) hospitalLabel.innerHTML = `<span class="text-red-400 font-bold">REJECTED by ${PRELOADED_CASE_DATA.hospital_name}</span>. Rerouting...`;
+        }
+    }
+
+    // --- Vitals extraction & validation ---
+    function getVitalsData() {
+        const vitalMap = {
+            "Age": "Age",
+            "Blood_Pressure_(systolic)": "Blood Pressure (systolic)",
+            "Blood_Pressure_(diastolic)": "Blood Pressure (diastolic)",
+            "Heart_Rate_(bpm)": "Heart Rate (bpm)",
+            "Oxygen_Level_(%)": "Oxygen Level (%)",
+            "Temperature_(F)": "Temperature (F)",
+            "Respiratory_Rate_(breaths/min)": "Respiratory Rate (breaths/min)"
+        };
+
+        const data_parts = [];
+        const ordered_ids = [
+            "Age",
+            "Blood_Pressure_(systolic)",
+            "Blood_Pressure_(diastolic)",
+            "Heart_Rate_(bpm)",
+            "Oxygen_Level_(%)",
+            "Temperature_(F)",
+            "Respiratory_Rate_(breaths/min)"
+        ];
+
+        for (const id of ordered_ids) {
+            const element = document.getElementById(id);
+            if (!element) {
+                alert(`Input Error: Required vital sign input field missing for ID: ${id}`);
+                return null;
+            }
+            let value = (element.value || '').toString().trim();
+            value = value.replace(/[^\d.]/g, '');
+            if (!value || isNaN(parseFloat(value))) {
+                alert(`Input Error: '${vitalMap[id]}' is missing or contains invalid characters.`);
+                return null;
+            }
+            data_parts.push(value);
+        }
+
+        const locationInputEl = document.getElementById('location-input');
+        const locationInput = locationInputEl ? locationInputEl.value.trim() : '';
+        if (!locationInput || locationInput.includes("Click 'Get Location'")) {
+            alert('Location Error: Please get or manually enter the current location before analysis.');
+            return null;
+        }
+
+        const checkedSymptoms = Array.from(document.querySelectorAll('#symptoms-checkbox-grid input[type="checkbox"]:checked'))
+            .map(input => input.value);
+
+        const symptomsEl = document.getElementById('symptoms-text');
+        let fullSymptoms = symptomsEl ? symptomsEl.value.trim() : '';
+        if (checkedSymptoms.length > 0) fullSymptoms = checkedSymptoms.join(', ') + (fullSymptoms ? ', ' + fullSymptoms : '');
+
+        const vitals = {};
+        const patientNameEl = document.getElementById('patient_name');
+        vitals.patient_name = patientNameEl ? patientNameEl.value.trim() || "Unknown Patient" : "Unknown Patient";
+        vitals.symptoms = fullSymptoms;
+        vitals.vitals_str = data_parts.join(',');
+        vitals.current_location = locationInput;
+        return vitals;
+    }
+
+    function updateLog(message, silent = false) {
+        const logArea = document.getElementById('text-log');
+        if (!logArea) return;
+        if (silent) {
+            const prefix = message.split(':')[0];
+            if (logArea.value.includes(prefix)) return;
+        }
+        logArea.value += `\n[${new Date().toLocaleTimeString()}] ${message}`;
+        logArea.scrollTop = logArea.scrollHeight;
+    }
+
+    // ---------------- Analysis, routing & alerts ----------------
+    async function analyzePatientCondition() {
+        const vitals = getVitalsData();
+        if (!vitals) return;
+
+        const analyzeBtn = document.getElementById('analyze-button');
+        if (analyzeBtn) analyzeBtn.disabled = true;
+
+        const hospitalLabel = document.getElementById('hospital-label');
+        if (hospitalLabel) hospitalLabel.textContent = "Status: Analyzing patient data...";
+        updateLog(`Analyzing patient ${vitals.patient_name}...`);
+
+        const crewName = localStorage.getItem('crewName') || '';
+
+        const { success, data } = await api_fetch('/api/analyze', 'POST', {
+            vitals: vitals.vitals_str,
+            current_location: vitals.current_location,
+            symptoms: vitals.symptoms,
+            crew_name: crewName
+        });
+
+        if (analyzeBtn) analyzeBtn.disabled = false;
+
+        CURRENT_PATIENT_VITALS = vitals;
+        CURRENT_PATIENT_ANALYSIS = data;
+        NEWLY_CREATED_CASE_ID = data.new_case_id;
+
+        const recSection = document.getElementById('hospitalRecommendationSection');
+        if (recSection) recSection.style.display = 'none';
+        const btnAcknowledge = document.getElementById('btnAcknowledge');
+        const btnStartNavigation = document.getElementById('btnStartNavigation');
+        const btnNewCase = document.getElementById('btnNewCase');
+        const divertBtn = document.getElementById('handleDivertClick');
+
+        if (btnAcknowledge) btnAcknowledge.disabled = true;
+        if (btnStartNavigation) btnStartNavigation.disabled = true;
+        if (btnNewCase) btnNewCase.disabled = true;
+        if (divertBtn) divertBtn.disabled = true;
+
+        if (!success || !data.new_case_id) {
+            const msg = data.message || 'Analysis failed and/or Case ID not generated.';
+            if (hospitalLabel) hospitalLabel.textContent = `ERROR: ${msg}`;
+            updateLog(`Analysis failed: ${msg}`);
+            return;
+        }
+
+        const route = data.route || {};
+        const isCritical = !!data.is_critical;
+        const prediction = data.prediction || 'No prediction available';
+        const doctor = route.doctor || {};
+
+        RECOMMENDED_HOSPITAL_LOCATION = route.lat_lon || null;
+        RECOMMENDED_HOSPITAL_NAME = route.name || null;
+
+        const conditionDetail = prediction.split(':').length > 1 ?
+            prediction.split(':').slice(1).join(':').trim() :
+            prediction;
+
+        const recDetailsDiv = document.getElementById('recommendationDetails');
+
+        if (Object.keys(route).length > 0 && recDetailsDiv) {
+            recDetailsDiv.innerHTML = `
+                <div class="alert alert-danger mb-3 p-3">
+                    <strong>Condition Detail:</strong> ${conditionDetail}
+                </div>
+                <table class="rec-table w-full">
+                    <tbody>
+                        <tr><th>Recommended Hospital:</th><td><strong class="${isCritical ? 'text-red-400' : 'text-green-400'}">${route.name}</strong> (${route.specialty})</td></tr>
+                        <tr><th>Doctor on Duty:</th><td>${doctor.name} (${doctor.qualification}) | Shift: ${doctor.shift}</td></tr>
+                        <tr><th>Distance:</th><td><span class="text-white font-semibold">${route.distance_km} km</span></td></tr>
+                        <tr><th>ETA:</th><td><span class="text-xl font-extrabold ${isCritical ? 'text-red-500' : 'text-yellow-400'}">${route.simulated_eta} minutes</span></td></tr>
+                        <tr><th>Destination Address:</th><td>${route.address}</td></tr>
+                    </tbody>
+                </table>
+            `;
+            if (recSection) recSection.style.display = 'block';
+            if (btnAcknowledge) btnAcknowledge.disabled = false;
+            if (divertBtn) divertBtn.disabled = false;
+
+            if (hospitalLabel) {
+                if (isCritical) hospitalLabel.innerHTML = `🚨 Condition: <span class="text-red-400 font-bold">CRITICAL</span> | Hospital: ${route.name}`;
+                else hospitalLabel.innerHTML = `✅ Condition: <span class="text-green-400 font-bold">STABLE</span> | Hospital: ${route.name}`;
+            }
+
+            updateLog(`*** ROUTING SUCCESS ***\nCondition: ${conditionDetail}\nRoute: ${route.name} | ETA: ${route.simulated_eta} min\nCase ID: ${data.new_case_id}\n`);
+        } else {
+            if (recDetailsDiv) recDetailsDiv.innerHTML = `<div class="alert alert-warning text-yellow-400">No suitable hospital route could be determined.</div>`;
+            if (recSection) recSection.style.display = 'block';
+            if (hospitalLabel) hospitalLabel.innerHTML = `⚠️ <span class="text-yellow-500 font-bold">WARNING:</span> Analysis complete but no route generated.`;
+        }
+
+        updateLog(`Dashboard Status: ${data.dashboard_status} (Critical Count: ${data.critical_count})`);
+    }
+
+    async function findAlternativeHospital() {
+        const statusCheckUrl = `/api/get_case_status/${NEWLY_CREATED_CASE_ID}`;
+        const statusResult = await api_fetch(statusCheckUrl, 'GET');
+        const divertBtn = document.getElementById('handleDivertClick');
+
+        if (!statusResult.success || statusResult.data.status !== 'REJECTED') {
+            const currentStatus = statusResult.data.status || 'N/A';
+            alert(`ACTION REQUIRED: The rerouting process must only be triggered after the hospital has officially rejected the case. Current Status: ${currentStatus}.`);
+            if (divertBtn) divertBtn.disabled = false;
+            return;
+        }
+
+        let hospitalName = RECOMMENDED_HOSPITAL_NAME;
+        if (!hospitalName) {
+            const recNameEl = document.querySelector('#recommendationDetails strong');
+            if (recNameEl) hospitalName = recNameEl.textContent;
+        }
+
+        let currentCaseId = NEWLY_CREATED_CASE_ID;
+        const pathParts = window.location.pathname.split('/');
+        if (!currentCaseId && pathParts.includes('case_vitals')) currentCaseId = pathParts[pathParts.length - 1];
+
+        if (!currentCaseId || !hospitalName) {
+             alert('Cannot find alternative: Case ID or Hospital Name missing.');
+             return;
+        }
+
+        const messageElement = document.getElementById('suggestionMessage');
+        if (divertBtn) divertBtn.disabled = true;
+        if (messageElement) {
+            messageElement.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 mr-1 animate-spin inline-block"></i> Hospital Rejected. Searching for next best option...`;
+            messageElement.classList.remove('hidden');
+        }
+
+        updateLog(`Hospital ${hospitalName} rejected. Finding alternative...`);
+
+        try {
+            const url = `/api/suggest-alternative/${currentCaseId}`;
+            const { success, data } = await api_fetch(url, 'POST', { current_hospital: hospitalName });
+
+            if (success && data.new_hospital) {
+                const newHospital = data.new_hospital;
+                updateLog(`SUCCESS: New destination: ${newHospital.name} | ETA: ${newHospital.simulated_eta} min`);
+                if (messageElement) messageElement.innerHTML = `✅ **REDIRECTED!** Target: <strong>${newHospital.name}</strong>. ETA: <strong>${newHospital.simulated_eta} min</strong>.`;
+
+                const recTable = document.querySelector('#recommendationDetails .rec-table');
+                if (recTable) {
+                    recTable.innerHTML = `
+                        <tbody>
+                            <tr><th>Recommended Hospital:</th><td><strong class="text-orange-400">${newHospital.name}</strong> (${newHospital.specialty})</td></tr>
+                            <tr><th>Doctor on Duty:</th><td>${newHospital.doctor.name} (${newHospital.doctor.qualification})</td></tr>
+                            <tr><th>Distance:</th><td><span class="text-white font-semibold">${newHospital.distance_km} km</span></td></tr>
+                            <tr><th>ETA:</th><td><span class="text-xl font-extrabold text-white">${newHospital.simulated_eta} minutes</span></td></tr>
+                            <tr><th>Destination Address:</th><td>${newHospital.address}</td></tr>
+                        </tbody>
+                    `;
+                }
+
+                RECOMMENDED_HOSPITAL_NAME = newHospital.name;
+                const ackBtn = document.getElementById('btnAcknowledge');
+                if (ackBtn) {
+                    ackBtn.disabled = false;
+                    ackBtn.innerHTML = '<i data-lucide="alert-circle" class="w-5 h-5 mr-2"></i> Send Alert to NEW Hospital';
+                }
+            } else {
+                if (messageElement) messageElement.textContent = data.message || "❌ No suitable alternative found.";
+            }
+        } catch (error) {
+            console.error("Alternative search failed:", error);
+            if (messageElement) messageElement.textContent = "❌ Error contacting routing server.";
+        } finally {
+            if (divertBtn) divertBtn.disabled = false;
+            lucide.createIcons();
+        }
+    }
+
+    async function handleAcknowledge() {
+        if (!RECOMMENDED_HOSPITAL_NAME || !CURRENT_PATIENT_VITALS || !CURRENT_PATIENT_ANALYSIS) {
+            if (!RECOMMENDED_HOSPITAL_NAME) {
+                 const recNameEl = document.querySelector('#recommendationDetails strong');
+                 if(recNameEl) RECOMMENDED_HOSPITAL_NAME = recNameEl.textContent;
+            }
+            if (!RECOMMENDED_HOSPITAL_NAME) {
+                alert('Acknowledge Error: Analysis data is missing. Please re-run analysis.');
+                return;
+            }
+        }
+
+        if (!NEWLY_CREATED_CASE_ID) {
+            const pathParts = window.location.pathname.split('/');
+            if (pathParts.includes('case_vitals')) NEWLY_CREATED_CASE_ID = pathParts[pathParts.length - 1];
+        }
+
+        if (!NEWLY_CREATED_CASE_ID) {
+            alert('Acknowledge Error: Case ID not generated. Please re-analyze.');
+            return;
+        }
+
+        const ackButton = document.getElementById('btnAcknowledge');
+        if (!ackButton) return;
+        ackButton.disabled = true;
+        ackButton.innerHTML = '<i data-lucide="loader-2" class="w-5 h-5 mr-2 animate-spin"></i> Sending Alert...';
+        lucide.createIcons();
+
+        await api_fetch('/api/increment-case-count', 'POST');
+
+        const currentHostname = window.location.hostname;
+        const dashboardUrl = `http://${currentHostname}:${HOSPITAL_DASHBOARD_PORT}/dashboard/${NEWLY_CREATED_CASE_ID}`;
+
+        updateLog(`\n=== ALERT SENT ===\n** SUCCESS: Patient Vitals and Status SENT to ${RECOMMENDED_HOSPITAL_NAME} **\nHospital view link available: ${dashboardUrl}\n==================`);
+
+        ackButton.innerHTML = '<i data-lucide="send" class="w-5 h-5 mr-2"></i> Alert Sent';
+        lucide.createIcons();
+
+        const navBtn = document.getElementById('btnStartNavigation');
+        if (navBtn) navBtn.disabled = false;
+
+        startStatusPolling(NEWLY_CREATED_CASE_ID, RECOMMENDED_HOSPITAL_NAME);
+    }
+
+    function handleStartNavigation() {
+        const navButton = document.getElementById('btnStartNavigation');
+        if (navButton) navButton.disabled = true;
+
+        updateLog('Navigation: Opening Google Maps for navigation...');
+        alert('Starting Navigation! Drive safe.');
+
+        const newCaseBtn = document.getElementById('btnNewCase');
+        if (newCaseBtn) newCaseBtn.disabled = false;
+
+        let destinationQuery = RECOMMENDED_HOSPITAL_NAME;
+        const destinationAddressEl = document.querySelector("#recommendationDetails .rec-table tbody tr:nth-child(5) td");
+        if (destinationAddressEl && destinationAddressEl.textContent) destinationQuery = destinationAddressEl.textContent.trim();
+
+        if (destinationQuery) {
+            const encodedDest = encodeURIComponent(destinationQuery);
+            const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodedDest}&dir_action=navigate`;
+            window.open(mapsUrl, '_blank');
+        } else alert("Error: No destination found to navigate to.");
+        lucide.createIcons();
+    }
+
+    function handleNewCase() {
+        updateLog('\n--- System Reset for New Case ---\n');
+        const recSection = document.getElementById('hospitalRecommendationSection');
+        if (recSection) recSection.style.display = 'none';
+        const vitalsForm = document.getElementById('vitals-form');
+        if (vitalsForm) vitalsForm.reset();
+
+        const symptomItems = document.querySelectorAll('#symptoms-checkbox-grid .symptom-item');
+        symptomItems.forEach(item => { if (item.classList.contains('checked')) toggleSymptom(item); });
+        const severeBleedingItem = Array.from(symptomItems).find(item => item.textContent.includes('Severe Bleeding'));
+        if (severeBleedingItem && !severeBleedingItem.classList.contains('checked')) toggleSymptom(severeBleedingItem);
+
+        NEWLY_CREATED_CASE_ID = null;
+        const hospitalLabel = document.getElementById('hospital-label');
+        if (hospitalLabel) hospitalLabel.textContent = "Status: Ready. Get location, enter vitals, and Analyze.";
+
+        const ackBtn = document.getElementById('btnAcknowledge');
+        if (ackBtn) { ackBtn.disabled = true; ackBtn.innerHTML = '<i data-lucide="alert-circle" class="w-5 h-5 mr-2"></i> Send Alert to Hospital'; }
+        const navBtn = document.getElementById('btnStartNavigation');
+        if (navBtn) navBtn.disabled = true;
+        const newCaseBtn = document.getElementById('btnNewCase');
+        if (newCaseBtn) newCaseBtn.disabled = true;
+        const divertBtn = document.getElementById('handleDivertClick');
+        if (divertBtn) divertBtn.disabled = true;
+        getAmbulanceLocation();
+        fetchDatabaseMetrics();
+        lucide.createIcons();
+    }
+
+    // ---------------- Initialization ----------------
+    document.addEventListener('DOMContentLoaded', () => {
+        if (PRELOADED_CASE_DATA) {
+            IS_AUTHENTICATED = true;
+            renderMainApp();
+            const urlParams = new URLSearchParams(window.location.search);
+            const notification = urlParams.get('notification');
+            if (notification) {
+                const recSection = document.getElementById('hospitalRecommendationSection');
+                if (recSection) recSection.style.display = 'block';
+                setTimeout(() => {
+                    alert(`⚠️ HOSPITAL UPDATE: ${notification}`);
+                    findAlternativeHospital();
+                }, 500);
+            }
+        } else {
+            renderLogin();
+        }
+
+        const initialSymptom = document.querySelector('.symptom-item.checked');
+        if (initialSymptom) { toggleSymptom(initialSymptom); toggleSymptom(initialSymptom); }
+    });
+</script>
+</body>
+</html>
