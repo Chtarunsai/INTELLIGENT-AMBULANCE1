@@ -32,9 +32,8 @@ AMBULANCE_APP_URL = os.environ.get("AMBULANCE_APP_URL", f"http://{MY_IP_ADDRESS}
 # --- FIX 2: TEMPLATE PATH ---
 # Assuming the file's current location relative to the top-level /templates folder is correct.
 # We are keeping the existing template_dir calculation (which was aiming for '../.. /.. /templates').
-template_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..', 'templates'))
-hospital_app = Flask(__name__, template_folder=template_dir) 
-
+template_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'templates')) 
+hospital_app = Flask(__name__, template_folder=template_dir)
 # --- FIX 3: DATABASE CONFIGURATION AND db DEFINITION (Corrected Order) ---
 hospital_app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///ambulance_app.db'
 hospital_app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False 
