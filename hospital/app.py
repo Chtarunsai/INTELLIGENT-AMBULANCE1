@@ -35,16 +35,24 @@ MY_IP_ADDRESS = get_local_ip()
 
 AMBULANCE_START_LOCATION = "17-22, 2nd Main Rd, Vinayak Nagar, Kattigenahalli, Bengaluru, Karnataka 560064"
 
+# app.py (around line 40 - Path Configuration Fix)
+
 HOSPITAL_DASHBOARD_PORT = 5001
 HOSPITAL_APP_URL = f"http://{MY_IP_ADDRESS}:{HOSPITAL_DASHBOARD_PORT}"
 
-# Ensure templates path correct when app is inside a subdirectory
-template_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'templates'))
-if not os.path.isdir(template_dir):
-    # fallback to a local templates folder (if the project uses one)
-    template_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), 'templates'))
+# --- FIX: Set template_folder directly using the provided absolute path ---
+# This ensures Flask finds the templates folder regardless of where app.py is executed from.
+# NOTE: Replace 'C:/Users/CHTAR/OneDrive/Desktop/pro/clite/templates' with your actual path
+# if the directory containing index.html changes. Using forward slashes is standard practice
+# for path compatibility in Python on Windows.
+template_dir = r'C:\Users\CHTAR\OneDrive\Desktop\pro\clite\templates'
+# Ensure Path object is created and then converted to string for safe use in Flask
+template_dir = str(Path(template_dir)) 
 
 app = Flask(__name__, template_folder=template_dir)
+
+# SQLite DB (file placed alongside app.py)
+# ...
 
 # SQLite DB (file placed alongside app.py)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///ambulance_app.db'
@@ -354,7 +362,7 @@ def case_vitals(case_id):
     notification_message = urllib.parse.unquote(notification_message_encoded) if notification_message_encoded else None
 
     try:
-        case = Case.query.get(case_id)
+        case = db.session.get(Case, case_id)
         if not case:
             return "Case not found.", 404
 
@@ -395,7 +403,7 @@ def receive_hospital_update(case_id):
     data = request.json or {}
     new_status = data.get('status')
 
-    case = Case.query.get(case_id)
+    case = db.session.get(Case, case_id)
     if not case:
         return jsonify({"success": False, "message": "Case not found."}), 404
 
@@ -409,14 +417,15 @@ def receive_hospital_update(case_id):
         return jsonify({"success": False, "message": f"DB Error updating status: {e}"}), 500
 
 
+# app.py (Around line 431)
+# app.py (Around line 422)
 @app.route('/api/get_case_status/<int:case_id>', methods=['GET'])
 def get_case_status(case_id):
     """Allows the Ambulance Client to check the current status before diverting."""
-    case = Case.query.get(case_id)
+    case = db.session.get(Case, case_id)
     if not case:
         return jsonify({"success": False, "status": "NOT_FOUND"}), 404
     return jsonify({"success": True, "status": case.acceptance_status}), 200
-
 
 @app.route('/api/register', methods=['POST'])
 def register_user():
@@ -474,6 +483,8 @@ def get_metrics():
         return jsonify({"success": False, "message": f"Error retrieving metrics: {e}"}), 500
 
 
+# app.py (inside @app.route('/api/analyze', methods=['POST']))
+# app.py (Starting at line 483, replacing the entire analyze_data function)
 @app.route('/api/analyze', methods=['POST'])
 def analyze_data():
     """
@@ -494,6 +505,14 @@ def analyze_data():
         return jsonify({"success": False, "message": "Vitals data is missing."}), 400
 
     vitals_list = vitals_str.split(',')
+    
+    # --- FIX: Ensure vitals_list has exactly 7 elements for consistent parsing ---
+    required_vitals_count = 7
+    if len(vitals_list) < required_vitals_count:
+        vitals_list.extend(['N/A'] * (required_vitals_count - len(vitals_list)))
+    
+    # Re-create the vitals_str from the fixed list to store the clean, 7-part string
+    clean_vitals_str = ','.join(vitals_list)
 
     prediction, is_critical = analyze_vitals_from_client(vitals_list, symptoms_str)
 
@@ -505,6 +524,7 @@ def analyze_data():
         mews_score = 0
         vitals_trend_json = None
 
+    # --- Re-added Hospital Eligibility Logic ---
     # Choose eligible hospitals
     if is_critical:
         target_tags = ["Critical Care", "Trauma", "Neuro", "Oncology", "Critical Care & Neuro", "General Critical Care"]
@@ -514,6 +534,7 @@ def analyze_data():
 
     if not eligible and HOSPITAL_DATA:
         eligible = HOSPITAL_DATA
+    # ---------------------------------------------
 
     route_info = {}
     best_hospital = None
@@ -534,6 +555,7 @@ def analyze_data():
         raw_time_min = best_hospital.get('distance_km', 0) / speed_km_min
         simulated_eta = round(raw_time_min * best_hospital.get('traffic_factor', 1.0))
 
+        # --- Re-added Complete route_info population ---
         route_info = {
             "name": best_hospital.get('name'),
             "specialty": best_hospital.get('specialty'),
@@ -544,23 +566,26 @@ def analyze_data():
             "doctor": best_hospital.get('doctors'),
             "origin_address": current_location
         }
+        # ---------------------------------------------
 
         try:
             new_case = Case(
                 crew_name=crew_name,
-                vitals_snapshot=vitals_str,
+                vitals_snapshot=clean_vitals_str, # Using the CLEANED string
                 symptoms_snapshot=symptoms_str,
                 ai_prediction=prediction,
                 is_critical=is_critical,
                 origin_address=current_location,
+                # --- Re-added missing Hospital fields ---
                 hospital_name=best_hospital.get('name'),
                 hospital_specialty=best_hospital.get('specialty'),
                 distance_km=best_hospital.get('distance_km'),
+                # ------------------------------------
                 simulated_eta_min=simulated_eta,
                 mews_score=mews_score,
                 vitals_trend_json=vitals_trend_json,
                 acceptance_status="AWAITING RESPONSE",
-                rejected_history=json.dumps([])  # start empty
+                rejected_history=json.dumps([]) 
             )
             db.session.add(new_case)
             db.session.commit()
@@ -589,7 +614,7 @@ def suggest_alternative(case_id):
     data = request.json or {}
     rejected_hospital_name = data.get('current_hospital')
 
-    case = Case.query.get(case_id)
+    case = db.session.get(Case, case_id)
     if not case:
         return jsonify({"success": False, "message": "Case not found."}), 404
 

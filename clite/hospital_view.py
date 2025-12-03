@@ -140,7 +140,7 @@ def update_acceptance(case_id):
         return jsonify({"success": False, "message": "Invalid status provided."}), 400
 
     with hospital_app.app_context():
-        case = Case.query.get(case_id)
+        case = db.session.get(Case, case_id)
         if not case:
             return jsonify({"success": False, "message": "Case not found"}), 404
 
@@ -171,7 +171,7 @@ def update_acceptance(case_id):
 @hospital_app.route('/api/case_data/<int:case_id>', methods=['GET'])
 def get_case_data(case_id):
     with hospital_app.app_context():
-        case = Case.query.get(case_id)
+        case = db.session.get(Case, case_id)
         if not case:
             return jsonify({"success": False, "message": "Case not found"}), 404
 
@@ -249,11 +249,15 @@ def dashboard_root():
         print(f"Internal error in dashboard_root: {e}")
         return f"Internal Server Error during case retrieval: {e}", 500
 
+# hospital_view.py (around line 262)
+
 @hospital_app.route('/dashboard/<int:case_id>')
 def hospital_dashboard(case_id):
     """Serves the main Hospital Dashboard HTML template."""
     try:
-        return render_template('hospital_dashboard.html', case_id=case_id, dashboard_url=AMBULANCE_APP_URL)
+        # FIX: Pass THIS server's base URL for client-side API calls, not the Ambulance Server's URL.
+        this_server_url = f"http://{MY_IP_ADDRESS}:{HOSPITAL_SERVER_PORT}"
+        return render_template('hospital_dashboard.html', case_id=case_id, dashboard_url=this_server_url)
     except Exception as e:
         # Provide more context to logs - this response is only for debugging (remove in production)
         err = f"Dashboard HTML file NOT FOUND or render error. Exception: {e}"

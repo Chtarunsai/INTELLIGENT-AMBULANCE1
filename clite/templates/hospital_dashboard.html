@@ -278,17 +278,17 @@
 
     </div>
 
-    <script>
+<script>
         // --- READ VARIABLES SAFELY FROM DATA ATTRIBUTES ---
         const bodyElement = document.body;
-        // FIX: Use the browser's current public URL (origin) for internal API calls.
-        const DASHBOARD_URL = window.location.origin; 
+        // REVERT FIX: Now use the correctly passed variable from the server.
+        const DASHBOARD_URL = bodyElement.getAttribute('data-dashboard-url'); 
         const CASE_ID = parseInt(bodyElement.getAttribute('data-case-id'));
         
         let hrChartInstance = null;
         let bpChartInstance = null;
         let o2ChartInstance = null;
-
+        
         // ====================================================================
         // --- CHART DRAWING FUNCTION ---
         // ====================================================================
@@ -501,6 +501,14 @@
             fetchCaseData(CASE_ID, DASHBOARD_URL).catch(err => {
                 console.error("Unexpected error during fetch process:", err);
             });
+
+            // --- INTEGRATE: Periodic Polling (fetch data every 5 seconds) ---
+            setInterval(() => {
+                fetchCaseData(CASE_ID, DASHBOARD_URL).catch(err => {
+                    // Log error but don't stop the interval
+                    console.error("Error during periodic data fetch:", err);
+                });
+            }, 5000); // 5000 milliseconds = 5 seconds
         });
     </script>
 </body>
