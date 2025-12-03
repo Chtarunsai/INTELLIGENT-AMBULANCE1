@@ -281,7 +281,7 @@
     <script>
         // --- READ VARIABLES SAFELY FROM DATA ATTRIBUTES ---
         const bodyElement = document.body;
-        // The Python backend injects a dummy URL, but we must use the actual URL the browser is currently viewing (origin)
+        // FIX: Use the browser's current public URL (origin) for internal API calls.
         const DASHBOARD_URL = window.location.origin; 
         const CASE_ID = parseInt(bodyElement.getAttribute('data-case-id'));
         
@@ -349,7 +349,7 @@
                 specialties: "Cardiac Sciences, Neurosciences, Orthopaedics, Organ Transplant"
             },
             "NAVYA MULTISPECIALITY HOSPITAL": {
-                 type: "Multi-Specialty", beds: "150+", icu: "15+ Dedicated Beds", services: "General ER, Diagnostics, General Surgery",
+                type: "Multi-Specialty", beds: "150+", icu: "15+ Dedicated Beds", services: "General ER, Diagnostics, General Surgery",
                 specialties: "General Surgery, Internal Medicine, Orthopaedics"
             },
             "N/A": {
@@ -412,11 +412,6 @@
                 if (result.success) {
                     console.log("Acceptance Status Updated:", result.new_status);
                     updateStatusDisplay(result.new_status);
-                    
-                    // --- FIX: REDIRECTION LOGIC REMOVED ---
-                    // The client now only updates the status display, keeping the hospital on their dashboard.
-                    // --------------------------------------
-
                 } else {
                     alert(`Error updating status: ${result.message}`);
                 }
