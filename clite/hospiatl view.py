@@ -1,16 +1,16 @@
 # hospital_dashboard.py - Hospital Server (Port 5001)
 
-from flask import Flask, render_template_string, jsonify, request
+from flask import Flask, render_template_string, jsonify, request, render_template # render_template added
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
-import os
+import os # <--- os module needed for path fixing
 import json 
 import socket 
 from pathlib import Path
 import urllib.parse 
-import requests # <--- IMPORT ADDED: Required to send POST notification
+import requests # Required to send POST notification
 
-# --- FUNCTION TO GET LOCAL IP (Needed for correct URL construction) ---
+# --- FUNCTION TO GET LOCAL IP (RETAINED FOR LOCAL DEBUGGING ONLY) ---
 def get_local_ip():
     """Detects the computer's local Wi-Fi/Ethernet IP address."""
     try:
@@ -26,15 +26,29 @@ def get_local_ip():
 HOSPITAL_SERVER_PORT = 5001
 MY_IP_ADDRESS = get_local_ip() 
 
-# Define the URL for the main ambulance client (Port 5000)
-# This is the target for the POST notification
-AMBULANCE_APP_URL = f"http://{MY_IP_ADDRESS}:5000" 
+# --- FIX 1: USE RENDER ENVIRONMENT VARIABLE ---
+# This pulls the public URL of the Ambulance Server from the Render settings.
+AMBULANCE_APP_URL = os.environ.get("AMBULANCE_APP_URL", f"http://{MY_IP_ADDRESS}:5000") 
+# The local IP fallback is retained for local testing only.
 
-# *** CRITICAL: VERIFY THIS PATH ON YOUR SYSTEM ***
-HOSPITAL_HTML_FILE_PATH = Path(r"C:\Users\CHTAR\OneDrive\Desktop\clite (2)\clite\project\AMBULANCE\hospital dashboard.html") 
+# *** FIX 2: REMOVE HARDCODED PATH AND USE RELATIVE PATH FIX ***
+# The line below is removed: HOSPITAL_HTML_FILE_PATH = Path(r"C:\Users\CHTAR\OneDrive\Desktop\clite (2)\clite\project\AMBULANCE\hospital dashboard.html") 
+# We rely on Flask's template folder setting.
 
-# --- Initialize Flask App ---
-hospital_app = Flask(__name__)
+# --- FIX 3: EXPLICITLY SET TEMPLATE FOLDER FOR NESTED APP ---
+# Assumes hospital_dashboard.py is inside /clite/project/AMBULANCE/
+# Need to go up four levels (../.. /.. /.. /templates) or adjust based on your final move.
+# Assuming the file is now /clite/project/AMBULANCE/hospital_view.py, let's use the correct relative path:
+template_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..', 'templates'))
+hospital_app = Flask(__name__, template_folder=template_dir) 
+
+# --- FIX 4: DB and Initialization Logic moved outside __main__ ---
+def initialize_db():
+    with hospital_app.app_context():
+        db.create_all()
+
+# --- Initialize DB on Startup so Gunicorn executes it ---
+initialize_db()
 
 # --- Database Configuration (Unchanged) ---
 hospital_app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///ambulance_app.db'
@@ -48,6 +62,7 @@ db = SQLAlchemy(hospital_app)
 
 class User(db.Model):
     __tablename__ = 'user'
+# ... (User Model Code) ...
     crew_name = db.Column(db.String(80), primary_key=True, unique=True, nullable=False)
     password_hash = db.Column(db.String(128), nullable=False)
     hospital_name = db.Column(db.String(120), nullable=False)
@@ -57,6 +72,7 @@ class User(db.Model):
 
 class Case(db.Model):
     __tablename__ = 'case'
+# ... (Case Model Code) ...
     id = db.Column(db.Integer, primary_key=True)
     timestamp = db.Column(db.DateTime, nullable=False, default=db.func.now())
     crew_name = db.Column(db.String(80), db.ForeignKey('user.crew_name'), nullable=True) 
@@ -85,7 +101,7 @@ class Case(db.Model):
 def update_acceptance(case_id):
     """
     Updates the hospital acceptance status and sends a direct notification 
-    to the Ambulance Server.
+    to the Ambulance Server using the AMBULANCE_APP_URL environment variable.
     """
     data = request.get_json()
     new_status = data.get('status')
@@ -103,13 +119,13 @@ def update_acceptance(case_id):
             case.acceptance_status = new_status
             db.session.commit()
             
-            # 2. NOTIFY AMBULANCE SERVER DIRECTLY
+            # 2. NOTIFY AMBULANCE SERVER DIRECTLY over the public internet
             ambulance_notify_url = f"{AMBULANCE_APP_URL}/api/receive_hospital_update/{case_id}"
             
             # Send POST request to the Ambulance Server
             try:
                 requests.post(ambulance_notify_url, json={'status': new_status})
-                print(f"[HOSPITAL SENT PUSH] Status {new_status} pushed to Ambulance Server.")
+                print(f"[HOSPITAL SENT PUSH] Status {new_status} pushed to Ambulance Server at {AMBULANCE_APP_URL}.")
             except Exception as e:
                 # Log the error, but don't fail the Hospital Server's transaction
                 print(f"[ERROR] Failed to send push notification to Ambulance Server: {e}")
@@ -128,6 +144,7 @@ def update_acceptance(case_id):
 
 @hospital_app.route('/api/case_data/<int:case_id>', methods=['GET'])
 def get_case_data(case_id):
+# ... (get_case_data route remains unchanged) ...
     """Fetches case data for the dashboard view."""
     with hospital_app.app_context():
         case = Case.query.get(case_id)
@@ -167,10 +184,11 @@ def get_case_data(case_id):
             "origin_address": case.origin_address,
             "eta_min": case.simulated_eta_min if case.simulated_eta_min is not None else 'N/A', 
             "triage_status": triage_status,
-            "mews_score": case.mews_score if case.mews_score is not None else 0,       
+            "mews_score": case.mews_score if case.mews_score is not None else 0,
             "vitals_trend": vitals_trend,
             "acceptance_status": case.acceptance_status 
         }
+        
         return jsonify(data)
 
 # ==============================================================================
@@ -180,20 +198,15 @@ def get_case_data(case_id):
 @hospital_app.route('/dashboard/<int:case_id>')
 def hospital_dashboard(case_id):
     """Serves the main Hospital Dashboard HTML template."""
+    # --- FIX 5: Use standard render_template ---
     try:
-        with open(str(HOSPITAL_HTML_FILE_PATH), 'r', encoding='utf-8') as f:
-            html_content = f.read()
-        
-        # Inject dynamic IP
-        return render_template_string(html_content, case_id=case_id, dashboard_url=f"http://{MY_IP_ADDRESS}:{HOSPITAL_SERVER_PORT}")
-    except FileNotFoundError:
-        print(f"\nFATAL HOSPITAL ERROR: HTML file not found at: {HOSPITAL_HTML_FILE_PATH}")
-        return f"Dashboard HTML file NOT FOUND. Check the path: {HOSPITAL_HTML_FILE_PATH}", 500
+        # Flask now knows the path via app initialization (template_folder=template_dir)
+        return render_template('hospital dashboard.html', case_id=case_id, dashboard_url=AMBULANCE_APP_URL)
+    except Exception as e:
+        return f"Dashboard HTML file NOT FOUND. Error: {e}", 500
 
 if __name__ == '__main__':
-    with hospital_app.app_context():
-        db.create_all()
-        
+    # This block now only handles the local running instance
     print(f"\n=======================================================")
     print(f"--- HOSPITAL SERVER RUNNING ---")
     print(f"--- 1. On THIS Computer: http://127.0.0.1:{HOSPITAL_SERVER_PORT}")
