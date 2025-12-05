@@ -1,1 +1,1 @@
-web: gunicorn hospital.app:app
+web: gunicorn wsgi:app
