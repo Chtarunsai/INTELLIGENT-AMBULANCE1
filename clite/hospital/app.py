@@ -45,7 +45,7 @@ HOSPITAL_APP_URL = f"http://{MY_IP_ADDRESS}:{HOSPITAL_DASHBOARD_PORT}"
 # NOTE: Replace 'C:/Users/CHTAR/OneDrive/Desktop/pro/clite/templates' with your actual path
 # if the directory containing index.html changes. Using forward slashes is standard practice
 # for path compatibility in Python on Windows.
-template_dir = r'C:\Users\CHTAR\OneDrive\Desktop\pro\clite\templates'
+template_dir = 'C:/Users/CHTAR/OneDrive/Desktop/pro/clite/templates'
 # Ensure Path object is created and then converted to string for safe use in Flask
 template_dir = str(Path(template_dir)) 
 
