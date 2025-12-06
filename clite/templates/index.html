@@ -14,7 +14,7 @@
 :root{
   --glass-bg: rgba(255,255,255,0.04);
   --glass-strong: rgba(255,255,255,0.06);
-  --glass-weak: rgba(255,255,255,0.02);
+  --glass-weak: rgba(255, 255, 255, 0);
   --accent: #6f44ff;        /* purple accent */
   --accent-2: #00d09c;      /* green accent */
   --danger: #ef4444;        /* red */
@@ -47,8 +47,8 @@ body {
 header.bg-header-bg {
   background: linear-gradient(180deg, rgba(12,18,28,0.72), rgba(8,12,20,0.55));
   border-bottom: 1px solid rgba(255,255,255,0.04);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
 }
 
 /* Generic card used across the app */
@@ -96,7 +96,7 @@ h1, h2 { color: #ffffff; }
 }
 .vitals-input::placeholder, .auth-input::placeholder { color: rgba(230,238,248,0.45); }
 .vitals-input:focus, .auth-input:focus, #location-input:focus, textarea:focus {
-  border-color: rgba(111,68,255,0.9);
+  border-color: rgba(0, 174, 255, 1);
   box-shadow: 0 6px 18px rgba(111,68,255,0.08);
   transform: translateY(-1px);
 }
@@ -124,7 +124,7 @@ button.bg-yellow-500 {
   box-shadow: 0 6px 18px rgba(245,158,11,0.12);
 }
 button.bg-red-600 {
-  background: linear-gradient(90deg, #ff6b6b, #ef4444);
+  background: linear-gradient(90deg, #ed1c1cff, #ed1c1cff);
   border-radius: 12px;
 }
 
@@ -155,7 +155,7 @@ button.bg-red-600 {
   border: 1px solid rgba(255,255,255,0.04);
   display:block;
 }
-.symptoms-panel h3 { color: #ffb3b3; }
+.symptoms-panel h3 { color: #eb3737ff; }
 #symptoms-checkbox-grid {
   gap: .75rem;
   display: grid;
@@ -394,7 +394,7 @@ body:before {
                         </button>
                     </div>
                 </div>
-                <footer class="text-sm text-gray-400 mt-4 text-center">© 2025 Intelligent Ambulance Network</footer>
+                <footer class="text-sm text-gray-400 mt-4 text-center"></footer>
             </div>
         `;
 
@@ -691,7 +691,7 @@ body:before {
                         <div class="col-span-1">
                             <label class="block text-sm font-semibold text-primary mt-2">
                                 Heart Rate (bpm)
-                                <span class="text-xs font-normal text-red-400">
+                                <span class="text-xs font-normal text-gray-400">
                                     (Range: 60 – 100 bpm)
                                 </span>
                             </label>
@@ -700,7 +700,7 @@ body:before {
                         <div class="col-span-1">
                             <label class="block text-sm font-semibold text-primary mt-2">
                                 Oxygen Level (%)
-                                <span class="text-xs font-normal text-red-400">
+                                <span class="text-xs font-normal text-gray-400">
                                     (Range: 94% – 100%)
                                 </span>
                             </label>

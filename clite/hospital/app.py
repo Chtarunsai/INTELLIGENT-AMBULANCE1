@@ -1,5 +1,5 @@
-# clite/hospital/app.py
-# Complete Ambulance Server app.py (deployment-friendly)
+# app.py - Main Ambulance Server (Port 5000)
+# Complete, cleaned, and ready-to-run version
 
 import json
 import random
@@ -10,34 +10,10 @@ import socket
 from datetime import datetime, timedelta
 from pathlib import Path
 import requests
-import traceback
 
-from flask import Flask, request, jsonify, render_template, redirect, url_for, current_app, Response
+from flask import Flask, request, jsonify, render_template, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
-
-# ------------------------------------------------------------------
-# Paths / Template / Static / DB configuration (portable)
-# ------------------------------------------------------------------
-# BASE_DIR -> clite/hospital
-BASE_DIR = Path(__file__).resolve().parent
-TEMPLATES_DIR = BASE_DIR / "templates"
-STATIC_DIR = BASE_DIR / "static"
-
-# PROJECT_ROOT -> pro (two levels up from hospital: hospital -> clite -> pro)
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-INSTANCE_DIR = PROJECT_ROOT / "instance"
-DB_PATH = INSTANCE_DIR / "ambulance_app.db"
-
-# Ensure instance directory exists
-os.makedirs(INSTANCE_DIR, exist_ok=True)
-
-# Flask app: ensure template/static load relative to this file
-app = Flask(__name__, template_folder=str(TEMPLATES_DIR), static_folder=str(STATIC_DIR))
-
-# Optional startup log
-app.logger.info(f"[startup] Using templates at: {TEMPLATES_DIR}")
-app.logger.info(f"[startup] Using DB at: {DB_PATH}")
 
 # ------------------------------------------------------------------
 # Configuration / Globals
@@ -56,12 +32,30 @@ def get_local_ip():
         return "127.0.0.1"
 
 MY_IP_ADDRESS = get_local_ip()
+
 AMBULANCE_START_LOCATION = "17-22, 2nd Main Rd, Vinayak Nagar, Kattigenahalli, Bengaluru, Karnataka 560064"
+
+# app.py (around line 40 - Path Configuration Fix)
+
 HOSPITAL_DASHBOARD_PORT = 5001
 HOSPITAL_APP_URL = f"http://{MY_IP_ADDRESS}:{HOSPITAL_DASHBOARD_PORT}"
 
-# Database config - use instance folder DB (portable across envs)
-app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{DB_PATH}"
+# --- FIX: Set template_folder directly using the provided absolute path ---
+# This ensures Flask finds the templates folder regardless of where app.py is executed from.
+# NOTE: Replace 'C:/Users/CHTAR/OneDrive/Desktop/pro/clite/templates' with your actual path
+# if the directory containing index.html changes. Using forward slashes is standard practice
+# for path compatibility in Python on Windows.
+template_dir = 'C:/Users/CHTAR/OneDrive/Desktop/pro/clite/templates'
+# Ensure Path object is created and then converted to string for safe use in Flask
+template_dir = str(Path(template_dir)) 
+
+app = Flask(__name__, template_folder=template_dir)
+
+# SQLite DB (file placed alongside app.py)
+# ...
+
+# SQLite DB (file placed alongside app.py)
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///ambulance_app.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
@@ -302,8 +296,8 @@ def _get_hardcoded_hospitals():
     """Initializes the hardcoded hospital data with simulated distances & timing factors."""
     base_hospitals = [
         {"name": "SPARSH Hospital", "address": "No. 1474/138, International Airport Road, Kogilu Cross, Yelahanka", "lat_lon": "13.0862,77.6322"},
-        {"name": "Navya Multispeciality Hospital", "address": "BB Road, Gandhi Nagar, Nehru Nagar, Bengaluru", "lat_lon": "13.0984,77.5986"},
-        {"name": "K K Hospital", "address": "#9, A-1/A-2, 9th A Cross Rd, Sector A, Yelahanka New Town", "lat_lon": "13.10048,77.59401"},
+        {"name": "Navya Multispeciality Hospital", "address": "BB Road, Gandhi Nagar, Nehru Nagar, Bengaluru", "lat_lon": "13.099681,77.597516"},
+        {"name": "K K Hospital", "address": "#9, A-1/A-2, 9th A Cross Rd, Sector A, Yelahanka New Town", "lat_lon": "13.097029,77.589406"},
         {"name": "Cytecare Cancer Hospitals", "address": "Near Bagalur Cross, Yelahanka", "lat_lon": "13.1166,77.6253"},
         {"name": "Aster CMI Hospital", "address": "New International Airport Road, near Sahakara Nagar", "lat_lon": "13.0531,77.5996"},
         {"name": "Government General Hospital", "address": "Yelahanka Old Town, next to the Old Anjanaya Temple", "lat_lon": "13.0991,77.5995"},
@@ -343,7 +337,7 @@ def initialize_app_data():
         with app.app_context():
             db.create_all()
     except Exception as e:
-        app.logger.exception(f"Database initialization failed: {e}")
+        print(f"Database initialization failed: {e}")
 
 
 # Initialize data & DB at import/run time (for Gunicorn compatibility)
@@ -358,8 +352,6 @@ def index():
     try:
         return render_template('index.html', is_vitals_view=False, case_data=None)
     except Exception as e:
-        # Log full traceback to Render logs
-        current_app.logger.exception("Error rendering index.html")
         return f"CRITICAL ERROR rendering index.html: {e}", 500
 
 
@@ -374,7 +366,7 @@ def case_vitals(case_id):
         if not case:
             return "Case not found.", 404
 
-        vitals_list = case.vitals_snapshot.split(',') if case.vitals_snapshot else []
+        vitals_list = case.vitals_snapshot.split(',')
         patient_data = {
             "id": case.id,
             "timestamp": case.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
@@ -402,7 +394,6 @@ def case_vitals(case_id):
 
         return render_template('index.html', case_data=patient_data, notification=notification_message, is_vitals_view=True)
     except Exception as e:
-        current_app.logger.exception("Error in case_vitals route")
         return f"Error rendering page: {e}", 500
 
 
@@ -419,14 +410,15 @@ def receive_hospital_update(case_id):
     try:
         case.acceptance_status = new_status
         db.session.commit()
-        app.logger.info(f"[SERVER NOTIFICATION] Case {case_id} status updated to {new_status} via HOSPITAL PUSH.")
+        print(f"\n[SERVER NOTIFICATION] Case {case_id} status updated to {new_status} via HOSPITAL PUSH.")
         return jsonify({"success": True, "message": f"Status updated for Case {case_id}"}), 200
     except Exception as e:
         db.session.rollback()
-        app.logger.exception("DB Error updating status")
         return jsonify({"success": False, "message": f"DB Error updating status: {e}"}), 500
 
 
+# app.py (Around line 431)
+# app.py (Around line 422)
 @app.route('/api/get_case_status/<int:case_id>', methods=['GET'])
 def get_case_status(case_id):
     """Allows the Ambulance Client to check the current status before diverting."""
@@ -434,7 +426,6 @@ def get_case_status(case_id):
     if not case:
         return jsonify({"success": False, "status": "NOT_FOUND"}), 404
     return jsonify({"success": True, "status": case.acceptance_status}), 200
-
 
 @app.route('/api/register', methods=['POST'])
 def register_user():
@@ -460,7 +451,7 @@ def register_user():
         return jsonify({"success": True, "message": "Registration successful. Please log in."}), 201
     except Exception as e:
         db.session.rollback()
-        app.logger.exception("Flask Registration Database Error")
+        print(f"Flask Registration Database Error: {e}")
         return jsonify({"success": False, "message": f"Database error during registration: {e}"}), 500
 
 
@@ -489,10 +480,11 @@ def get_metrics():
         patient_count = Case.query.count()
         return jsonify({"success": True, "user_count": user_count, "patient_count": patient_count}), 200
     except Exception as e:
-        app.logger.exception("Error retrieving metrics")
         return jsonify({"success": False, "message": f"Error retrieving metrics: {e}"}), 500
 
 
+# app.py (inside @app.route('/api/analyze', methods=['POST']))
+# app.py (Starting at line 483, replacing the entire analyze_data function)
 @app.route('/api/analyze', methods=['POST'])
 def analyze_data():
     """
@@ -513,9 +505,13 @@ def analyze_data():
         return jsonify({"success": False, "message": "Vitals data is missing."}), 400
 
     vitals_list = vitals_str.split(',')
+    
+    # --- FIX: Ensure vitals_list has exactly 7 elements for consistent parsing ---
     required_vitals_count = 7
     if len(vitals_list) < required_vitals_count:
         vitals_list.extend(['N/A'] * (required_vitals_count - len(vitals_list)))
+    
+    # Re-create the vitals_str from the fixed list to store the clean, 7-part string
     clean_vitals_str = ','.join(vitals_list)
 
     prediction, is_critical = analyze_vitals_from_client(vitals_list, symptoms_str)
@@ -524,11 +520,12 @@ def analyze_data():
         mews_score = calculate_mews_score(vitals_list)
         vitals_trend_json = generate_vitals_trend(vitals_list)
     except Exception as e:
-        app.logger.exception("DATA GENERATION ERROR")
+        print(f"DATA GENERATION ERROR: {e}")
         mews_score = 0
         vitals_trend_json = None
 
-    # Hospital eligibility
+    # --- Re-added Hospital Eligibility Logic ---
+    # Choose eligible hospitals
     if is_critical:
         target_tags = ["Critical Care", "Trauma", "Neuro", "Oncology", "Critical Care & Neuro", "General Critical Care"]
         eligible = [h for h in (HOSPITAL_DATA or []) if any(tag in h.get('specialty', '') for tag in target_tags)]
@@ -537,6 +534,7 @@ def analyze_data():
 
     if not eligible and HOSPITAL_DATA:
         eligible = HOSPITAL_DATA
+    # ---------------------------------------------
 
     route_info = {}
     best_hospital = None
@@ -552,10 +550,12 @@ def analyze_data():
     dashboard_status, critical_count = analyze_vitals_for_dashboard(vitals_list)
 
     if best_hospital:
+        # average speed ~ 40 km/h => 0.67 km/min
         speed_km_min = 0.67
         raw_time_min = best_hospital.get('distance_km', 0) / speed_km_min
         simulated_eta = round(raw_time_min * best_hospital.get('traffic_factor', 1.0))
 
+        # --- Re-added Complete route_info population ---
         route_info = {
             "name": best_hospital.get('name'),
             "specialty": best_hospital.get('specialty'),
@@ -566,30 +566,33 @@ def analyze_data():
             "doctor": best_hospital.get('doctors'),
             "origin_address": current_location
         }
+        # ---------------------------------------------
 
         try:
             new_case = Case(
                 crew_name=crew_name,
-                vitals_snapshot=clean_vitals_str,
+                vitals_snapshot=clean_vitals_str, # Using the CLEANED string
                 symptoms_snapshot=symptoms_str,
                 ai_prediction=prediction,
                 is_critical=is_critical,
                 origin_address=current_location,
+                # --- Re-added missing Hospital fields ---
                 hospital_name=best_hospital.get('name'),
                 hospital_specialty=best_hospital.get('specialty'),
                 distance_km=best_hospital.get('distance_km'),
+                # ------------------------------------
                 simulated_eta_min=simulated_eta,
                 mews_score=mews_score,
                 vitals_trend_json=vitals_trend_json,
                 acceptance_status="AWAITING RESPONSE",
-                rejected_history=json.dumps([])
+                rejected_history=json.dumps([]) 
             )
             db.session.add(new_case)
             db.session.commit()
             new_case_id = new_case.id
         except Exception as e:
             db.session.rollback()
-            app.logger.exception("FATAL DATABASE COMMIT ERROR (Case not saved)")
+            print(f"FATAL DATABASE COMMIT ERROR (Case not saved): {e}")
 
     return jsonify({
         "success": True,
@@ -615,11 +618,13 @@ def suggest_alternative(case_id):
     if not case:
         return jsonify({"success": False, "message": "Case not found."}), 404
 
+    # Load existing rejected history
     try:
         history = json.loads(case.rejected_history) if case.rejected_history else []
     except Exception:
         history = []
 
+    # Add the newly rejected hospital to history (if provided)
     if rejected_hospital_name and rejected_hospital_name not in history:
         history.append(rejected_hospital_name)
 
@@ -632,7 +637,6 @@ def suggest_alternative(case_id):
     try:
         best_hospital = min(remaining_hospitals, key=lambda h: h.get('distance_km', 9999) * h.get('traffic_factor', 1.0))
     except Exception as e:
-        app.logger.exception("Error calculating alternative route")
         return jsonify({"success": False, "message": f"Error calculating alternative route: {e}"}), 500
 
     speed_km_min = 0.67
@@ -659,7 +663,6 @@ def suggest_alternative(case_id):
         db.session.commit()
     except Exception as e:
         db.session.rollback()
-        app.logger.exception("DB Error updating alternative")
         return jsonify({"success": False, "message": f"DB Error: {e}"}), 500
 
     return jsonify({"success": True, "new_hospital": new_route_info}), 200
@@ -681,7 +684,6 @@ def get_case_history():
         } for case in cases]
         return jsonify({"success": True, "cases": case_list}), 200
     except Exception as e:
-        app.logger.exception("Error retrieving cases")
         return jsonify({"success": False, "message": f"Error retrieving cases: {e}"}), 500
 
 
@@ -700,5 +702,5 @@ if __name__ == '__main__':
     print(f"--- 1. On THIS Computer: http://127.0.0.1:{SERVER_PORT}")
     print(f"--- 2. On OTHER Devices: http://{MY_IP_ADDRESS}:{SERVER_PORT}")
     print("=======================================================\n")
-    # debug=True for local development only; remove or set False in production
+    # Note: debug=True for local development only; remove in production
     app.run(host='0.0.0.0', port=SERVER_PORT, debug=True)
