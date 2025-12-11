@@ -99,7 +99,7 @@ def hospital_dashboard_inline(case_id):
 class User(db.Model):
     __tablename__ = 'user'
     crew_name = db.Column(db.String(80), primary_key=True, unique=True, nullable=False)
-    password_hash = db.Column(db.String(128), nullable=False)
+    password_hash = db.Column(db.String(255), nullable=False)
     hospital_name = db.Column(db.String(120), nullable=False)
     hospital_id = db.Column(db.String(50), nullable=False)
 
