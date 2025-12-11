@@ -4,9 +4,9 @@ gunicorn==21.2.0
 python-dotenv==1.0.1
 
 # Data & ML
-pandas==2.1.4
-numpy==1.26.3
-scikit-learn==1.3.2
+pandas>=2.2.3  # Changed
+numpy>=1.26.4  # Changed
+scikit-learn>=1.4.1 # Changed
 joblib==1.3.2
 
 # Optional but recommended
