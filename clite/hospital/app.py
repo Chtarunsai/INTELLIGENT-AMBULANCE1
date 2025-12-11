@@ -341,9 +341,15 @@ def initialize_app_data():
     HOSPITAL_DATA = _get_hardcoded_hospitals()
     try:
         with app.app_context():
-            db.create_all()
+            # --- TEMPORARY FIX: Force Drop/Create to update schema ---
+            print("Attempting to DROP and CREATE tables to fix schema mismatch...")
+            db.drop_all() # <-- DROP ALL EXISTING TABLES
+            db.create_all() # <-- RECREATE TABLES with 255-character size
+            print("Database schema successfully reset.")
+            # --------------------------------------------------------
     except Exception as e:
-        print(f"Database initialization failed: {e}")
+        print(f"FATAL: Database initialization failed: {e}")
+# ...
 
 
 # Initialize data & DB at import/run time (for Gunicorn compatibility)
