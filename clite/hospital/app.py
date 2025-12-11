@@ -35,20 +35,26 @@ MY_IP_ADDRESS = get_local_ip()
 
 AMBULANCE_START_LOCATION = "17-22, 2nd Main Rd, Vinayak Nagar, Kattigenahalli, Bengaluru, Karnataka 560064"
 
-# app.py (around line 40 - Path Configuration Fix)
+# ------------------------------------------------------------------
+# Configuration / Globals
+# ------------------------------------------------------------------
+# ... (existing code for port, IP, etc.)
 
 HOSPITAL_DASHBOARD_PORT = 5001
 HOSPITAL_APP_URL = f"http://{MY_IP_ADDRESS}:{HOSPITAL_DASHBOARD_PORT}"
 
-# --- FIX: Set template_folder directly using the provided absolute path ---
-# This ensures Flask finds the templates folder regardless of where app.py is executed from.
-# NOTE: Replace 'C:/Users/CHTAR/OneDrive/Desktop/pro/clite/templates' with your actual path
-# if the directory containing index.html changes. Using forward slashes is standard practice
-# for path compatibility in Python on Windows.
-template_dir = 'C:/Users/CHTAR/OneDrive/Desktop/pro/clite/templates'
-# Ensure Path object is created and then converted to string for safe use in Flask
-template_dir = str(Path(template_dir)) 
+# --- UNIVERSAL TEMPLATE PATH FIX ---
+# Calculate the directory path relative to the current file (app.py)
+# This handles the case where app.py is in 'clite/hospital' and templates is in 'clite/templates'
 
+# 1. Get the directory containing the current file (app.py) -> .../clite/hospital
+base_dir = os.path.dirname(os.path.abspath(__file__))
+
+# 2. Go up one directory (..) and into the 'templates' folder
+# This results in: .../clite/templates
+template_dir = os.path.join(base_dir, '..', 'templates') 
+
+# Instantiate Flask with the correctly calculated template path
 app = Flask(__name__, template_folder=template_dir)
 
 # SQLite DB (file placed alongside app.py)
