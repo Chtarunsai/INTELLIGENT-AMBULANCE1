@@ -36,7 +36,7 @@ hospital_app = Flask(__name__, template_folder=template_dir)
 
 
 # --- FIX 3: DATABASE CONFIGURATION AND db DEFINITION (Corrected Order) ---
-hospital_app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///ambulance_app.db'
+hospital_app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get("DATABASE_URL")
 hospital_app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(hospital_app)
