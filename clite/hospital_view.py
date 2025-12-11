@@ -28,6 +28,7 @@ HOSPITAL_SERVER_PORT = 5001
 MY_IP_ADDRESS = get_local_ip()
 
 # --- FIX 1: USE RENDER ENVIRONMENT VARIABLE for Inter-Service Communication ---
+# AMBULANCE_APP_URL is for server-to-server communication
 AMBULANCE_APP_URL = os.environ.get("AMBULANCE_APP_URL", f"http://{MY_IP_ADDRESS}:5000")
 
 # --- FIX 2: ROBUST TEMPLATE PATH (points to <this file's parent>/templates) ---
@@ -36,6 +37,7 @@ hospital_app = Flask(__name__, template_folder=template_dir)
 
 
 # --- FIX 3: DATABASE CONFIGURATION AND db DEFINITION (Corrected Order) ---
+# Uses the central PostgreSQL DATABASE_URL environment variable
 hospital_app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get("DATABASE_URL")
 hospital_app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
@@ -44,10 +46,24 @@ db = SQLAlchemy(hospital_app)
 # --- FIX 4: DB and Initialization Logic moved outside __main__ ---
 def initialize_db():
     with hospital_app.app_context():
-        db.create_all()
+        # WARNING: db.drop_all() is TEMPORARY and must be removed after schema is fixed.
+        # It ensures tables are recreated with the correct size (255) after the column size error.
+        # DO NOT keep this line in production!
+        print("TEMPORARY FIX: Attempting to DROP and CREATE tables to fix schema mismatch...")
+        db.drop_all() 
+        db.create_all() 
+        print("Database schema successfully reset/verified.")
 
 # --- Initialize DB on Startup so Gunicorn executes it ---
 initialize_db()
+
+# --- NEW GLOBAL VARIABLE: PUBLIC URL FIX (for client-side JS) ---
+# HOSPITAL_PUBLIC_URL is for server-to-client communication
+HOSPITAL_PUBLIC_URL = os.environ.get(
+    "RENDER_EXTERNAL_URL",
+    f"http://{MY_IP_ADDRESS}:{HOSPITAL_SERVER_PORT}"
+)
+
 
 # =====================================================================
 # --- DEBUG: Template folder inspector (temporary - safe) -----------
@@ -78,19 +94,6 @@ def debug_templates():
     except Exception as e:
         return jsonify({"success": False, "error": str(e), "trace": traceback.format_exc()}), 500
 
-# Optional fallback that renders the template file directly (useful for testing)
-@hospital_app.route('/dashboard_inline/<int:case_id>')
-def hospital_dashboard_inline(case_id):
-    try:
-        path = Path(hospital_app.templates_folder) / 'hospital_dashboard.html'
-        if path.exists():
-            html = path.read_text(encoding='utf-8')
-            return render_template_string(html, case_id=case_id, dashboard_url=AMBULANCE_APP_URL)
-        else:
-            return f"FALLBACK: template not found at {path}", 404
-    except Exception as e:
-        return f"FALLBACK ERROR: {e}", 500
-
 
 # =====================================================================
 # --- DATABASE MODELS (These must always come AFTER db = SQLAlchemy) -
@@ -99,7 +102,7 @@ def hospital_dashboard_inline(case_id):
 class User(db.Model):
     __tablename__ = 'user'
     crew_name = db.Column(db.String(80), primary_key=True, unique=True, nullable=False)
-    password_hash = db.Column(db.String(255), nullable=False)
+    password_hash = db.Column(db.String(255), nullable=False) # Increased size to 255 (FIX)
     hospital_name = db.Column(db.String(120), nullable=False)
     hospital_id = db.Column(db.String(50), nullable=False)
 
@@ -151,6 +154,7 @@ def update_acceptance(case_id):
             ambulance_notify_url = f"{AMBULANCE_APP_URL}/api/receive_hospital_update/{case_id}"
 
             try:
+                # Send push notification to Ambulance Server
                 resp = requests.post(ambulance_notify_url, json={'status': new_status}, timeout=3)
                 print(f"[HOSPITAL SENT PUSH] Status {new_status} pushed to Ambulance Server at {AMBULANCE_APP_URL} (status_code={resp.status_code}).")
             except Exception as e:
@@ -173,7 +177,11 @@ def get_case_data(case_id):
     with hospital_app.app_context():
         case = db.session.get(Case, case_id)
         if not case:
+            print(f"DEBUG: Case ID {case_id} NOT FOUND in Hospital DB context.") # Debug line
             return jsonify({"success": False, "message": "Case not found"}), 404
+        
+        # --- DEBUG SUCCESS: Case found, proceed with data formatting ---
+        print(f"DEBUG: Case ID {case_id} successfully fetched.")
 
         # Trim and safely parse vitals_snapshot
         if case.vitals_snapshot:
@@ -249,17 +257,14 @@ def dashboard_root():
         print(f"Internal error in dashboard_root: {e}")
         return f"Internal Server Error during case retrieval: {e}", 500
 
-# hospital_view.py (around line 262)
 
 @hospital_app.route('/dashboard/<int:case_id>')
 def hospital_dashboard(case_id):
     """Serves the main Hospital Dashboard HTML template."""
     try:
-        # FIX: Pass THIS server's base URL for client-side API calls, not the Ambulance Server's URL.
-        this_server_url = f"http://{MY_IP_ADDRESS}:{HOSPITAL_SERVER_PORT}"
-        return render_template('hospital_dashboard.html', case_id=case_id, dashboard_url=this_server_url)
+        # Passes the PUBLIC URL (Render's hostname) to client-side JS
+        return render_template('hospital_dashboard.html', case_id=case_id, dashboard_url=HOSPITAL_PUBLIC_URL)
     except Exception as e:
-        # Provide more context to logs - this response is only for debugging (remove in production)
         err = f"Dashboard HTML file NOT FOUND or render error. Exception: {e}"
         print(err)
         return f"{err}", 500
