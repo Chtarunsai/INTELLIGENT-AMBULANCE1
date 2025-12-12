@@ -61,7 +61,15 @@ app = Flask(__name__, template_folder=template_dir)
 # ...
 
 # SQLite DB (file placed alongside app.py)
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get("DATABASE_URL")
+# app.py (around line 60, where configuration starts)
+
+# We use os.environ.get with a fallback value.
+# RENDER will use the PostgreSQL URL (if DATABASE_URL is set).
+# Your LOCAL PC will use the SQLite file (since DATABASE_URL is not set).
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get(
+    "DATABASE_URL",
+    "sqlite:///ambulance_app.db"  # <-- LOCAL FALLBACK FOR YOUR PC
+)
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)

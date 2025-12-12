@@ -38,7 +38,15 @@ hospital_app = Flask(__name__, template_folder=template_dir)
 
 # --- FIX 3: DATABASE CONFIGURATION AND db DEFINITION (Corrected Order) ---
 # Uses the central PostgreSQL DATABASE_URL environment variable
-hospital_app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get("DATABASE_URL")
+# hospital_view.py (Database Configuration Block)
+
+# We use os.environ.get with a fallback value.
+# RENDER will use the PostgreSQL URL (if DATABASE_URL is set).
+# Your LOCAL PC will use the SQLite file (since DATABASE_URL is not set).
+hospital_app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get(
+    "DATABASE_URL",
+    "sqlite:///ambulance_app.db"  # <-- LOCAL FALLBACK FOR YOUR PC
+)
 hospital_app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(hospital_app)
