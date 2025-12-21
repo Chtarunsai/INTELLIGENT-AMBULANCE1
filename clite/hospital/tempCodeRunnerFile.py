@@ -1,6 +1,3 @@
-# app.py - Main Ambulance Server (Port 5000)
-# Complete, cleaned, and ready-to-run version
-
 import json
 import random
 import time
@@ -10,16 +7,10 @@ import socket
 from datetime import datetime, timedelta
 from pathlib import Path
 import requests
-
 from flask import Flask, request, jsonify, render_template, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
-
-# ------------------------------------------------------------------
-# Configuration / Globals
-# ------------------------------------------------------------------
 SERVER_PORT = 5000
-
 def get_local_ip():
     """Detects the computer's local Wi-Fi/Ethernet IP address."""
     try:
@@ -30,56 +21,20 @@ def get_local_ip():
         return ip
     except Exception:
         return "127.0.0.1"
-
 MY_IP_ADDRESS = get_local_ip()
-
 AMBULANCE_START_LOCATION = "17-22, 2nd Main Rd, Vinayak Nagar, Kattigenahalli, Bengaluru, Karnataka 560064"
-
-# ------------------------------------------------------------------
-# Configuration / Globals
-# ------------------------------------------------------------------
-# ... (existing code for port, IP, etc.)
-
 HOSPITAL_DASHBOARD_PORT = 5001
 HOSPITAL_APP_URL = f"http://{MY_IP_ADDRESS}:{HOSPITAL_DASHBOARD_PORT}"
-
-# --- UNIVERSAL TEMPLATE PATH FIX ---
-# Calculate the directory path relative to the current file (app.py)
-# This handles the case where app.py is in 'clite/hospital' and templates is in 'clite/templates'
-
-# 1. Get the directory containing the current file (app.py) -> .../clite/hospital
 base_dir = os.path.dirname(os.path.abspath(__file__))
-
-# 2. Go up one directory (..) and into the 'templates' folder
-# This results in: .../clite/templates
 template_dir = os.path.join(base_dir, '..', 'templates') 
-
-# Instantiate Flask with the correctly calculated template path
 app = Flask(__name__, template_folder=template_dir)
-
-# SQLite DB (file placed alongside app.py)
-# ...
-
-# SQLite DB (file placed alongside app.py)
-# app.py (around line 60, where configuration starts)
-
-# We use os.environ.get with a fallback value.
-# RENDER will use the PostgreSQL URL (if DATABASE_URL is set).
-# Your LOCAL PC will use the SQLite file (since DATABASE_URL is not set).
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get(
     "DATABASE_URL",
-    "sqlite:///ambulance_app.db"  # <-- LOCAL FALLBACK FOR YOUR PC
+    "sqlite:///ambulance_app.db"  
 )
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
 db = SQLAlchemy(app)
-
-# Global hospital dataset (populated by initialize_app_data)
 HOSPITAL_DATA = None
-
-# ------------------------------------------------------------------
-# Database Models
-# ------------------------------------------------------------------
 class User(db.Model):
     """Stores crew registration data."""
     __tablename__ = 'user'
@@ -88,47 +43,33 @@ class User(db.Model):
     hospital_name = db.Column(db.String(120), nullable=False)
     hospital_id = db.Column(db.String(50), nullable=False)
     cases = db.relationship('Case', backref='crew_member', lazy='dynamic')
-
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
-
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
-
     def __repr__(self):
         return f'<User {self.crew_name}>'
-
-
 class Case(db.Model):
     """Stores case / incident records."""
     __tablename__ = 'case'
     id = db.Column(db.Integer, primary_key=True)
     timestamp = db.Column(db.DateTime, nullable=False, default=db.func.now())
     crew_name = db.Column(db.String(80), db.ForeignKey('user.crew_name'), nullable=True)
-
     vitals_snapshot = db.Column(db.String(255), nullable=False)
     symptoms_snapshot = db.Column(db.String(512), nullable=True)
     ai_prediction = db.Column(db.String(255), nullable=False)
     is_critical = db.Column(db.Boolean, nullable=False)
-
     origin_address = db.Column(db.String(255), nullable=False)
     hospital_name = db.Column(db.String(120), nullable=True)
     hospital_specialty = db.Column(db.String(120), nullable=True)
     distance_km = db.Column(db.Float, nullable=True)
     simulated_eta_min = db.Column(db.Integer, nullable=True)
-
-    # Critical fields
     mews_score = db.Column(db.Integer, nullable=True)
     vitals_trend_json = db.Column(db.Text, nullable=True)
     acceptance_status = db.Column(db.String(50), default="AWAITING RESPONSE")
-    rejected_history = db.Column(db.Text, nullable=True)  # JSON list of rejected hospitals
-
+    rejected_history = db.Column(db.Text, nullable=True)  
     def __repr__(self):
         return f'<Case {self.id} - {self.hospital_name} - {self.acceptance_status}>'
-
-# ------------------------------------------------------------------
-# Utility / Clinical Analysis Functions
-# ------------------------------------------------------------------
 def calculate_mews_score(vitals):
     """
     Calculates a simulated MEWS-like score.
@@ -143,33 +84,31 @@ def calculate_mews_score(vitals):
         return 0
 
     score = 0
-    # Respiratory
+   
     if resp_rate < 9 or resp_rate > 25:
         score += 3
     elif resp_rate > 20:
         score += 2
     elif resp_rate > 15:
         score += 1
-    # Heart rate
+   
     if hr < 40 or hr > 130:
         score += 3
     elif hr > 110:
         score += 2
     elif hr < 50 or hr > 90:
         score += 1
-    # BP systolic
+  
     if bp_sys < 70 or bp_sys > 200:
         score += 3
     elif bp_sys < 90:
         score += 2
     elif bp_sys > 180:
         score += 1
-    # O2
+
     if o2 < 90:
         score += 2
     return score
-
-
 def analyze_vitals_from_client(vitals_list, symptoms_str=""):
     """
     Simple in-app analyzer that returns (prediction_str, is_critical_bool).
@@ -184,8 +123,6 @@ def analyze_vitals_from_client(vitals_list, symptoms_str=""):
         temp = float(vitals_list[5]) if len(vitals_list) > 5 and vitals_list[5] != "" else 36.6
     except Exception:
         return "UNDETERMINED", False
-
-    # Basic MEWS-derived score
     score = 0
     if resp < 9 or resp > 25:
         score += 3
@@ -211,7 +148,7 @@ def analyze_vitals_from_client(vitals_list, symptoms_str=""):
     if o2 < 90:
         score += 2
 
-    # Symptom keyword boosting (expanded list)
+    
     symptoms = (symptoms_str or "").lower()
     dangerous_keywords = [
         "unconscious", "bleeding", "chest pain", "respiratory arrest",
@@ -263,7 +200,7 @@ def generate_vitals_trend(vitals_list):
     now = datetime.now()
 
     for i in range(5):
-        time_offset = (4 - i) * 5  # minutes before current
+        time_offset = (4 - i) * 5  
         timestamp = (now - timedelta(minutes=time_offset)).strftime('%H:%M')
         if i < 4:
             hr = round(hr_base + random.uniform(-4, 4))
@@ -280,9 +217,7 @@ def generate_vitals_trend(vitals_list):
     return json.dumps(trend_data)
 
 
-# ------------------------------------------------------------------
-# Simulated Hospital Data / Helpers
-# ------------------------------------------------------------------
+
 def _simulate_doctors(specialty):
     """Generates simulated doctor data based on specialty."""
     if "Cardiology" in specialty:
@@ -349,23 +284,20 @@ def initialize_app_data():
     HOSPITAL_DATA = _get_hardcoded_hospitals()
     try:
         with app.app_context():
-            # --- TEMPORARY FIX: Force Drop/Create to update schema ---
+           
             print("Attempting to DROP and CREATE tables to fix schema mismatch...")
-            db.drop_all() # <-- DROP ALL EXISTING TABLES
-            db.create_all() # <-- RECREATE TABLES with 255-character size
+            db.drop_all() 
+            db.create_all() 
             print("Database schema successfully reset.")
-            # --------------------------------------------------------
+         
     except Exception as e:
         print(f"FATAL: Database initialization failed: {e}")
-# ...
 
 
-# Initialize data & DB at import/run time (for Gunicorn compatibility)
+
 initialize_app_data()
 
-# ------------------------------------------------------------------
-# Routes
-# ------------------------------------------------------------------
+
 @app.route('/', methods=['GET'])
 def index():
     """Serves the main HTML application."""
@@ -437,8 +369,7 @@ def receive_hospital_update(case_id):
         return jsonify({"success": False, "message": f"DB Error updating status: {e}"}), 500
 
 
-# app.py (Around line 431)
-# app.py (Around line 422)
+
 @app.route('/api/get_case_status/<int:case_id>', methods=['GET'])
 def get_case_status(case_id):
     """Allows the Ambulance Client to check the current status before diverting."""
@@ -501,10 +432,6 @@ def get_metrics():
         return jsonify({"success": True, "user_count": user_count, "patient_count": patient_count}), 200
     except Exception as e:
         return jsonify({"success": False, "message": f"Error retrieving metrics: {e}"}), 500
-
-
-# app.py (inside @app.route('/api/analyze', methods=['POST']))
-# app.py (Starting at line 483, replacing the entire analyze_data function)
 @app.route('/api/analyze', methods=['POST'])
 def analyze_data():
     """
@@ -526,12 +453,10 @@ def analyze_data():
 
     vitals_list = vitals_str.split(',')
     
-    # --- FIX: Ensure vitals_list has exactly 7 elements for consistent parsing ---
+    
     required_vitals_count = 7
     if len(vitals_list) < required_vitals_count:
         vitals_list.extend(['N/A'] * (required_vitals_count - len(vitals_list)))
-    
-    # Re-create the vitals_str from the fixed list to store the clean, 7-part string
     clean_vitals_str = ','.join(vitals_list)
 
     prediction, is_critical = analyze_vitals_from_client(vitals_list, symptoms_str)
@@ -543,9 +468,6 @@ def analyze_data():
         print(f"DATA GENERATION ERROR: {e}")
         mews_score = 0
         vitals_trend_json = None
-
-    # --- Re-added Hospital Eligibility Logic ---
-    # Choose eligible hospitals
     if is_critical:
         target_tags = ["Critical Care", "Trauma", "Neuro", "Oncology", "Critical Care & Neuro", "General Critical Care"]
         eligible = [h for h in (HOSPITAL_DATA or []) if any(tag in h.get('specialty', '') for tag in target_tags)]
@@ -554,7 +476,7 @@ def analyze_data():
 
     if not eligible and HOSPITAL_DATA:
         eligible = HOSPITAL_DATA
-    # ---------------------------------------------
+    
 
     route_info = {}
     best_hospital = None
@@ -570,12 +492,12 @@ def analyze_data():
     dashboard_status, critical_count = analyze_vitals_for_dashboard(vitals_list)
 
     if best_hospital:
-        # average speed ~ 40 km/h => 0.67 km/min
+       
         speed_km_min = 0.67
         raw_time_min = best_hospital.get('distance_km', 0) / speed_km_min
         simulated_eta = round(raw_time_min * best_hospital.get('traffic_factor', 1.0))
 
-        # --- Re-added Complete route_info population ---
+       
         route_info = {
             "name": best_hospital.get('name'),
             "specialty": best_hospital.get('specialty'),
@@ -586,21 +508,21 @@ def analyze_data():
             "doctor": best_hospital.get('doctors'),
             "origin_address": current_location
         }
-        # ---------------------------------------------
+       
 
         try:
             new_case = Case(
                 crew_name=crew_name,
-                vitals_snapshot=clean_vitals_str, # Using the CLEANED string
+                vitals_snapshot=clean_vitals_str,
                 symptoms_snapshot=symptoms_str,
                 ai_prediction=prediction,
                 is_critical=is_critical,
                 origin_address=current_location,
-                # --- Re-added missing Hospital fields ---
+              
                 hospital_name=best_hospital.get('name'),
                 hospital_specialty=best_hospital.get('specialty'),
                 distance_km=best_hospital.get('distance_km'),
-                # ------------------------------------
+              
                 simulated_eta_min=simulated_eta,
                 mews_score=mews_score,
                 vitals_trend_json=vitals_trend_json,
@@ -637,14 +559,12 @@ def suggest_alternative(case_id):
     case = db.session.get(Case, case_id)
     if not case:
         return jsonify({"success": False, "message": "Case not found."}), 404
-
-    # Load existing rejected history
     try:
         history = json.loads(case.rejected_history) if case.rejected_history else []
     except Exception:
         history = []
 
-    # Add the newly rejected hospital to history (if provided)
+    
     if rejected_hospital_name and rejected_hospital_name not in history:
         history.append(rejected_hospital_name)
 
@@ -709,18 +629,11 @@ def get_case_history():
 
 @app.route('/api/increment-case-count', methods=['POST'])
 def increment_case_count():
-    # Placeholder -- returns success so client-side counters can call it.
     return jsonify({"success": True}), 200
-
-
-# ------------------------------------------------------------------
-# Local run block
-# ------------------------------------------------------------------
 if __name__ == '__main__':
     print("\n=======================================================")
     print(f"--- AMBULANCE SERVER RUNNING ---")
     print(f"--- 1. On THIS Computer: http://127.0.0.1:{SERVER_PORT}")
     print(f"--- 2. On OTHER Devices: http://{MY_IP_ADDRESS}:{SERVER_PORT}")
     print("=======================================================\n")
-    # Note: debug=True for local development only; remove in production
     app.run(host='0.0.0.0', port=SERVER_PORT, debug=True)

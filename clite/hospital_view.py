@@ -1,5 +1,3 @@
-# hospital_view.py - Hospital Server (Port 5001)
-
 from flask import Flask, render_template_string, jsonify, request, render_template, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
@@ -11,7 +9,7 @@ import urllib.parse
 import requests
 import traceback
 
-# --- FUNCTION TO GET LOCAL IP (RETAINED FOR LOCAL DEBUGGING ONLY) ---
+
 def get_local_ip():
     """Detects the computer's local Wi-Fi/Ethernet IP address."""
     try:
@@ -23,59 +21,42 @@ def get_local_ip():
     except Exception:
         return "127.0.0.1"
 
-# --- CONFIGURATION ---
+
 HOSPITAL_SERVER_PORT = 5001
 MY_IP_ADDRESS = get_local_ip()
 
-# --- FIX 1: USE RENDER ENVIRONMENT VARIABLE for Inter-Service Communication ---
-# AMBULANCE_APP_URL is for server-to-server communication
+
 AMBULANCE_APP_URL = os.environ.get("AMBULANCE_APP_URL", f"http://{MY_IP_ADDRESS}:5000")
 
-# --- FIX 2: ROBUST TEMPLATE PATH (points to <this file's parent>/templates) ---
+
 template_dir = str(Path(__file__).resolve().parent.joinpath('templates'))
 hospital_app = Flask(__name__, template_folder=template_dir)
 
 
-# --- FIX 3: DATABASE CONFIGURATION AND db DEFINITION (Corrected Order) ---
-# Uses the central PostgreSQL DATABASE_URL environment variable
-# hospital_view.py (Database Configuration Block)
 
-# We use os.environ.get with a fallback value.
-# RENDER will use the PostgreSQL URL (if DATABASE_URL is set).
-# Your LOCAL PC will use the SQLite file (since DATABASE_URL is not set).
 hospital_app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get(
     "DATABASE_URL",
-    "sqlite:///ambulance_app.db"  # <-- LOCAL FALLBACK FOR YOUR PC
+    "sqlite:///ambulance_app.db" 
 )
 hospital_app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(hospital_app)
 
-# --- FIX 4: DB and Initialization Logic moved outside __main__ ---
+
 def initialize_db():
     with hospital_app.app_context():
-        # WARNING: db.drop_all() is TEMPORARY and must be removed after schema is fixed.
-        # It ensures tables are recreated with the correct size (255) after the column size error.
-        # DO NOT keep this line in production!
         print("TEMPORARY FIX: Attempting to DROP and CREATE tables to fix schema mismatch...")
         db.drop_all() 
         db.create_all() 
         print("Database schema successfully reset/verified.")
 
-# --- Initialize DB on Startup so Gunicorn executes it ---
 initialize_db()
 
-# --- NEW GLOBAL VARIABLE: PUBLIC URL FIX (for client-side JS) ---
-# HOSPITAL_PUBLIC_URL is for server-to-client communication
+
 HOSPITAL_PUBLIC_URL = os.environ.get(
     "RENDER_EXTERNAL_URL",
     f"http://{MY_IP_ADDRESS}:{HOSPITAL_SERVER_PORT}"
 )
-
-
-# =====================================================================
-# --- DEBUG: Template folder inspector (temporary - safe) -----------
-# =====================================================================
 @hospital_app.route('/_debug_templates')
 def debug_templates():
     """Return JSON showing template_folder and files inside it (for debugging only)."""
@@ -101,16 +82,10 @@ def debug_templates():
         return jsonify({"success": True, "info": info})
     except Exception as e:
         return jsonify({"success": False, "error": str(e), "trace": traceback.format_exc()}), 500
-
-
-# =====================================================================
-# --- DATABASE MODELS (These must always come AFTER db = SQLAlchemy) -
-# =====================================================================
-
 class User(db.Model):
     __tablename__ = 'user'
     crew_name = db.Column(db.String(80), primary_key=True, unique=True, nullable=False)
-    password_hash = db.Column(db.String(255), nullable=False) # Increased size to 255 (FIX)
+    password_hash = db.Column(db.String(255), nullable=False) 
     hospital_name = db.Column(db.String(120), nullable=False)
     hospital_id = db.Column(db.String(50), nullable=False)
 
@@ -133,14 +108,10 @@ class Case(db.Model):
     distance_km = db.Column(db.Float, nullable=True)
     simulated_eta_min = db.Column(db.Integer, nullable=True)
 
-    # --- CRITICAL FIELDS ---
+    
     mews_score = db.Column(db.Integer, nullable=True)
     vitals_trend_json = db.Column(db.Text, nullable=True)
     acceptance_status = db.Column(db.String(50), default="AWAITING RESPONSE")
-
-# =====================================================================
-# --- API ENDPOINTS ---------------------------------------------------
-# =====================================================================
 
 @hospital_app.route('/api/update_acceptance/<int:case_id>', methods=['POST'])
 def update_acceptance(case_id):
@@ -162,7 +133,7 @@ def update_acceptance(case_id):
             ambulance_notify_url = f"{AMBULANCE_APP_URL}/api/receive_hospital_update/{case_id}"
 
             try:
-                # Send push notification to Ambulance Server
+                
                 resp = requests.post(ambulance_notify_url, json={'status': new_status}, timeout=3)
                 print(f"[HOSPITAL SENT PUSH] Status {new_status} pushed to Ambulance Server at {AMBULANCE_APP_URL} (status_code={resp.status_code}).")
             except Exception as e:
@@ -185,13 +156,13 @@ def get_case_data(case_id):
     with hospital_app.app_context():
         case = db.session.get(Case, case_id)
         if not case:
-            print(f"DEBUG: Case ID {case_id} NOT FOUND in Hospital DB context.") # Debug line
+            print(f"DEBUG: Case ID {case_id} NOT FOUND in Hospital DB context.") 
             return jsonify({"success": False, "message": "Case not found"}), 404
         
-        # --- DEBUG SUCCESS: Case found, proceed with data formatting ---
+       
         print(f"DEBUG: Case ID {case_id} successfully fetched.")
 
-        # Trim and safely parse vitals_snapshot
+        
         if case.vitals_snapshot:
             vitals_list = [v.strip() for v in case.vitals_snapshot.split(',') if v is not None]
         else:
@@ -204,11 +175,11 @@ def get_case_data(case_id):
         except json.JSONDecodeError:
             vitals_trend = None
 
-        # Ensure Vitals List is complete
+       
         if len(vitals_list) < 7:
             vitals_list = vitals_list + ['N/A'] * (7 - len(vitals_list))
 
-        # Use 12-hour format with AM/PM
+    
         timestamp_str = case.timestamp.strftime('%I:%M:%S %p') if case.timestamp else 'N/A'
 
         data = {
@@ -238,10 +209,6 @@ def get_case_data(case_id):
         }
         return jsonify(data)
 
-# =====================================================================
-# --- MAIN DASHBOARD ROUTE --------------------------------------------
-# =====================================================================
-
 @hospital_app.route('/')
 def dashboard_root():
     ambulance_api_url = f"{AMBULANCE_APP_URL}/api/cases"
@@ -270,7 +237,6 @@ def dashboard_root():
 def hospital_dashboard(case_id):
     """Serves the main Hospital Dashboard HTML template."""
     try:
-        # Passes the PUBLIC URL (Render's hostname) to client-side JS
         return render_template('hospital_dashboard.html', case_id=case_id, dashboard_url=HOSPITAL_PUBLIC_URL)
     except Exception as e:
         err = f"Dashboard HTML file NOT FOUND or render error. Exception: {e}"
@@ -283,5 +249,4 @@ if __name__ == '__main__':
     print(f"--- 1. On THIS Computer: http://127.0.0.1:{HOSPITAL_SERVER_PORT}")
     print(f"--- 2. On OTHER Devices: http://{MY_IP_ADDRESS}:{HOSPITAL_SERVER_PORT}")
     print(f"=======================================================\n")
-
     hospital_app.run(host='0.0.0.0', port=HOSPITAL_SERVER_PORT, debug=True)
